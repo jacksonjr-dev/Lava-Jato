@@ -48,14 +48,14 @@ export const DEFAULT_SERVICES = [
 export async function recognizePlateFromImage(
   imageDataUrl: string,
 ): Promise<{ plate: string; confidence: number }> {
-  const apiKey = process.env["LOVABLE_API_KEY"];
+  const apiKey = process.env["OPENAI_API_KEY"];
   if (!apiKey) throw new Error("Serviço de reconhecimento indisponível.");
 
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model: process.env["OPENAI_VISION_MODEL"] ?? "gpt-4.1-mini",
       messages: [
         {
           role: "system",

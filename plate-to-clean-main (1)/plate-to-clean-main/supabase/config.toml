@@ -1,1 +1,2 @@
-project_id = "xwjnpmcwtaxrnefkgdqb"
+# This project is intentionally not linked to a remote Supabase instance.
+# Run `supabase link --project-ref <your-project-ref>` after creating your project.
