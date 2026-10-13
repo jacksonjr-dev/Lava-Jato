@@ -30,6 +30,7 @@ import {
   demoSearchPublicTenants,
   demoSession,
   demoUpdateOrderStatus,
+  demoUpdateBusinessProfile,
   demoUpdatePixSettings,
   demoVehicleSummary,
   isDemoServerMode,
@@ -283,16 +284,102 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
 export const getSession = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    if (isDemoServerMode()) return demoSession();
+    if (isDemoServerMode()) {
+      return {
+        ...demoSession(),
+        user: { id: "demo-user", email: "demo@lavapro.local" },
+      };
+    }
     const membership = await getMembership(context.supabase, context.userId);
-    if (!membership) return { membership: null, tenant: null };
+    if (!membership) {
+      return {
+        membership: null,
+        tenant: null,
+        user: {
+          id: context.userId,
+          email: typeof context.claims.email === "string" ? context.claims.email : null,
+        },
+      };
+    }
     const { data: tenant, error } = await context.supabase
       .from("tenants")
       .select("*")
       .eq("id", membership.tenantId)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    return { membership, tenant };
+    return {
+      membership,
+      tenant,
+      user: {
+        id: context.userId,
+        email: typeof context.claims.email === "string" ? context.claims.email : null,
+      },
+    };
+  });
+
+export const updateTenantProfile = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(
+    (data: {
+      nome: string;
+      telefone?: string;
+      endereco?: string;
+      horario?: string;
+      logo_url?: string;
+      public_listing: boolean;
+    }) => data,
+  )
+  .handler(async ({ data, context }) => {
+    const nome = data.nome.trim();
+    const telefone = data.telefone?.trim() || null;
+    const endereco = data.endereco?.trim() || null;
+    const horario = data.horario?.trim() || null;
+    const logoUrl = data.logo_url?.trim() || null;
+
+    if (nome.length < 2 || nome.length > 80) {
+      throw new Error("Informe um nome entre 2 e 80 caracteres.");
+    }
+    if (telefone && !/^\d{10,11}$/.test(phoneDigits(telefone))) {
+      throw new Error("Informe um telefone válido com DDD.");
+    }
+    if (endereco && endereco.length > 180) {
+      throw new Error("O endereço deve ter no máximo 180 caracteres.");
+    }
+    if (horario && horario.length > 120) {
+      throw new Error("O horário deve ter no máximo 120 caracteres.");
+    }
+    if (logoUrl) {
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(logoUrl);
+      } catch {
+        throw new Error("Informe um link válido para o logo.");
+      }
+      if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+        throw new Error("O link do logo deve começar com http:// ou https://.");
+      }
+    }
+
+    const profile = {
+      nome,
+      telefone,
+      endereco,
+      horario,
+      logo_url: logoUrl,
+      public_listing: data.public_listing,
+    };
+
+    if (isDemoServerMode()) return demoUpdateBusinessProfile(profile);
+
+    const { tenantId } = await requireManager(context.supabase, context.userId);
+    const { data: tenant, error } = await context.supabase
+      .from("tenants")
+      .update(profile)
+      .eq("id", tenantId)
+      .select("*")
+      .single();
+    if (error) throw new Error("Não foi possível atualizar o perfil do lava-jato.");
+    return tenant;
   });
 
 export const getDemoOwnerLoginHint = createServerFn({ method: "GET" }).handler(() => {

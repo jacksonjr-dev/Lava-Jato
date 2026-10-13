@@ -16,6 +16,7 @@ import { Route as ClienteRouteImport } from './routes/cliente'
 import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authenticated/financeiro'
 import { Route as AuthenticatedHomeRouteImport } from './routes/_authenticated/home'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
+import { Route as AuthenticatedPerfilRouteImport } from './routes/_authenticated/perfil'
 import { Route as AuthenticatedVeiculosRouteImport } from './routes/_authenticated/veiculos'
 import { Route as AuthenticatedAtendimentoNovoRouteImport } from './routes/_authenticated/atendimento.novo'
 import { Route as AuthenticatedOsIdRouteImport } from './routes/_authenticated/os.$id'
@@ -54,6 +55,11 @@ const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
   path: '/onboarding',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedPerfilRoute = AuthenticatedPerfilRouteImport.update({
+  id: '/perfil',
+  path: '/perfil',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedVeiculosRoute = AuthenticatedVeiculosRouteImport.update({
   id: '/veiculos',
   path: '/veiculos',
@@ -78,6 +84,7 @@ export interface FileRoutesByFullPath {
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/home': typeof AuthenticatedHomeRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/perfil': typeof AuthenticatedPerfilRoute
   '/veiculos': typeof AuthenticatedVeiculosRoute
   '/atendimento/novo': typeof AuthenticatedAtendimentoNovoRoute
   '/os/$id': typeof AuthenticatedOsIdRoute
@@ -89,6 +96,7 @@ export interface FileRoutesByTo {
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/home': typeof AuthenticatedHomeRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/perfil': typeof AuthenticatedPerfilRoute
   '/veiculos': typeof AuthenticatedVeiculosRoute
   '/atendimento/novo': typeof AuthenticatedAtendimentoNovoRoute
   '/os/$id': typeof AuthenticatedOsIdRoute
@@ -102,6 +110,7 @@ export interface FileRoutesById {
   '/_authenticated/financeiro': typeof AuthenticatedFinanceiroRoute
   '/_authenticated/home': typeof AuthenticatedHomeRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
+  '/_authenticated/perfil': typeof AuthenticatedPerfilRoute
   '/_authenticated/veiculos': typeof AuthenticatedVeiculosRoute
   '/_authenticated/atendimento/novo': typeof AuthenticatedAtendimentoNovoRoute
   '/_authenticated/os/$id': typeof AuthenticatedOsIdRoute
@@ -115,6 +124,7 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/home'
     | '/onboarding'
+    | '/perfil'
     | '/veiculos'
     | '/atendimento/novo'
     | '/os/$id'
@@ -126,6 +136,7 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/home'
     | '/onboarding'
+    | '/perfil'
     | '/veiculos'
     | '/atendimento/novo'
     | '/os/$id'
@@ -138,6 +149,7 @@ export interface FileRouteTypes {
     | '/_authenticated/financeiro'
     | '/_authenticated/home'
     | '/_authenticated/onboarding'
+    | '/_authenticated/perfil'
     | '/_authenticated/veiculos'
     | '/_authenticated/atendimento/novo'
     | '/_authenticated/os/$id'
@@ -201,6 +213,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/perfil': {
+      id: '/_authenticated/perfil'
+      path: '/perfil'
+      fullPath: '/perfil'
+      preLoaderRoute: typeof AuthenticatedPerfilRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/veiculos': {
       id: '/_authenticated/veiculos'
       path: '/veiculos'
@@ -229,6 +248,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedFinanceiroRoute: typeof AuthenticatedFinanceiroRoute
   AuthenticatedHomeRoute: typeof AuthenticatedHomeRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
+  AuthenticatedPerfilRoute: typeof AuthenticatedPerfilRoute
   AuthenticatedVeiculosRoute: typeof AuthenticatedVeiculosRoute
   AuthenticatedAtendimentoNovoRoute: typeof AuthenticatedAtendimentoNovoRoute
   AuthenticatedOsIdRoute: typeof AuthenticatedOsIdRoute
@@ -238,6 +258,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFinanceiroRoute: AuthenticatedFinanceiroRoute,
   AuthenticatedHomeRoute: AuthenticatedHomeRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
+  AuthenticatedPerfilRoute: AuthenticatedPerfilRoute,
   AuthenticatedVeiculosRoute: AuthenticatedVeiculosRoute,
   AuthenticatedAtendimentoNovoRoute: AuthenticatedAtendimentoNovoRoute,
   AuthenticatedOsIdRoute: AuthenticatedOsIdRoute,

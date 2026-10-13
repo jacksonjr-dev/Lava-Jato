@@ -1,9 +1,17 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Car, House, LogOut, WalletCards } from "lucide-react";
+import { ArrowLeft, Building2, Car, House, LogOut, Menu, WalletCards } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { ReactNode } from "react";
 import {
   endDemoSession,
@@ -69,9 +77,47 @@ export function AppShell({
             ) : null}
           </div>
           {action ?? (
-            <Button variant="ghost" size="icon" onClick={signOut} aria-label="Sair">
-              <LogOut className="size-5" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-xl transition-transform duration-200 hover:scale-105 active:scale-90"
+                  aria-label="Abrir menu da conta"
+                >
+                  <Menu className="size-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="w-64 rounded-2xl border-primary/25 bg-card/98 p-2 shadow-xl backdrop-blur"
+              >
+                <DropdownMenuLabel className="px-3 py-2">
+                  <span className="block truncate text-xs text-muted-foreground">Lava-jato</span>
+                  <span className="mt-0.5 block truncate text-sm">
+                    {businessName ?? "Minha empresa"}
+                  </span>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  asChild
+                  className="rounded-xl px-3 py-3 focus:bg-primary/10 focus:text-primary"
+                >
+                  <Link to="/perfil">
+                    <Building2 />
+                    Perfil do lava-jato
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="rounded-xl px-3 py-3 text-destructive focus:bg-destructive/10 focus:text-destructive"
+                  onSelect={() => void signOut()}
+                >
+                  <LogOut />
+                  Sair
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
       </header>

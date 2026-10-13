@@ -82,7 +82,9 @@ type DemoBusinessSettings = {
   nome: string;
   telefone: string | null;
   endereco: string | null;
+  horario: string | null;
   logo_url: string | null;
+  public_listing: boolean;
 };
 type DemoPixSettings = {
   pix_key: string;
@@ -101,7 +103,9 @@ const defaultBusinessSettings: DemoBusinessSettings = {
   nome: "LavaPro Demonstração",
   telefone: "(85) 3333-2026",
   endereco: "Fortaleza - CE",
+  horario: "Segunda a sábado, 08h às 18h",
   logo_url: null,
+  public_listing: true,
 };
 const demoPixSettingsPath = resolve(process.cwd(), ".data", "demo-pix-settings.json");
 const demoBusinessSettingsPath = resolve(process.cwd(), ".data", "demo-business-settings.json");
@@ -668,7 +672,25 @@ export function demoCreateBusiness(data: {
     nome,
     telefone: data.telefone?.trim() || null,
     endereco: data.endereco?.trim() || null,
+    horario: null,
     logo_url: data.logo_url?.trim() || null,
+    public_listing: true,
+  };
+  persistDemoBusinessSettings(businessSettings);
+  return businessSettings;
+}
+
+export function demoUpdateBusinessProfile(data: {
+  nome: string;
+  telefone: string | null;
+  endereco: string | null;
+  horario: string | null;
+  logo_url: string | null;
+  public_listing: boolean;
+}) {
+  businessSettings = {
+    ...businessSettings,
+    ...data,
   };
   persistDemoBusinessSettings(businessSettings);
   return businessSettings;
