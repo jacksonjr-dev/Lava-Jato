@@ -10,12 +10,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS service_orders_tenant_id_id_unique
   ON public.service_orders (tenant_id, id);
 
 ALTER TABLE public.vehicles DROP CONSTRAINT IF EXISTS vehicles_customer_id_fkey;
+ALTER TABLE public.vehicles DROP CONSTRAINT IF EXISTS vehicles_customer_same_tenant_fkey;
 ALTER TABLE public.vehicles
   ADD CONSTRAINT vehicles_customer_same_tenant_fkey
   FOREIGN KEY (tenant_id, customer_id) REFERENCES public.customers (tenant_id, id);
 
 ALTER TABLE public.service_orders DROP CONSTRAINT IF EXISTS service_orders_customer_id_fkey;
 ALTER TABLE public.service_orders DROP CONSTRAINT IF EXISTS service_orders_vehicle_id_fkey;
+ALTER TABLE public.service_orders DROP CONSTRAINT IF EXISTS service_orders_customer_same_tenant_fkey;
+ALTER TABLE public.service_orders DROP CONSTRAINT IF EXISTS service_orders_vehicle_same_tenant_fkey;
 ALTER TABLE public.service_orders
   ADD CONSTRAINT service_orders_customer_same_tenant_fkey
   FOREIGN KEY (tenant_id, customer_id) REFERENCES public.customers (tenant_id, id);
@@ -25,6 +28,8 @@ ALTER TABLE public.service_orders
 
 ALTER TABLE public.service_order_items DROP CONSTRAINT IF EXISTS service_order_items_order_id_fkey;
 ALTER TABLE public.service_order_items DROP CONSTRAINT IF EXISTS service_order_items_service_id_fkey;
+ALTER TABLE public.service_order_items DROP CONSTRAINT IF EXISTS service_order_items_order_same_tenant_fkey;
+ALTER TABLE public.service_order_items DROP CONSTRAINT IF EXISTS service_order_items_service_same_tenant_fkey;
 ALTER TABLE public.service_order_items
   ADD CONSTRAINT service_order_items_order_same_tenant_fkey
   FOREIGN KEY (tenant_id, order_id)
@@ -34,6 +39,7 @@ ALTER TABLE public.service_order_items
   FOREIGN KEY (tenant_id, service_id) REFERENCES public.services (tenant_id, id);
 
 ALTER TABLE public.payments DROP CONSTRAINT IF EXISTS payments_order_id_fkey;
+ALTER TABLE public.payments DROP CONSTRAINT IF EXISTS payments_order_same_tenant_fkey;
 ALTER TABLE public.payments
   ADD CONSTRAINT payments_order_same_tenant_fkey
   FOREIGN KEY (tenant_id, order_id)
@@ -41,6 +47,8 @@ ALTER TABLE public.payments
 
 ALTER TABLE public.order_photos DROP CONSTRAINT IF EXISTS order_photos_order_id_fkey;
 ALTER TABLE public.order_photos DROP CONSTRAINT IF EXISTS order_photos_vehicle_id_fkey;
+ALTER TABLE public.order_photos DROP CONSTRAINT IF EXISTS order_photos_order_same_tenant_fkey;
+ALTER TABLE public.order_photos DROP CONSTRAINT IF EXISTS order_photos_vehicle_same_tenant_fkey;
 ALTER TABLE public.order_photos
   ADD CONSTRAINT order_photos_order_same_tenant_fkey
   FOREIGN KEY (tenant_id, order_id)
