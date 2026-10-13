@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createTenant, getSession } from "@/lib/lavajato.functions";
+import { completeDemoBusinessRegistration, isDemoOnboardingPending } from "@/lib/demo-auth";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
   head: () => ({
@@ -27,8 +28,13 @@ function Onboarding() {
   const queryClient = useQueryClient();
   const session = useServerFn(getSession);
   const create = useServerFn(createTenant);
+  const demoOnboardingPending = isDemoOnboardingPending();
 
-  const sessionQuery = useQuery({ queryKey: ["session"], queryFn: () => session() });
+  const sessionQuery = useQuery({
+    queryKey: ["session"],
+    queryFn: () => session(),
+    enabled: !demoOnboardingPending,
+  });
 
   useEffect(() => {
     if (sessionQuery.data?.membership) navigate({ to: "/home", replace: true });
@@ -40,9 +46,28 @@ function Onboarding() {
   const [logoUrl, setLogoUrl] = useState("");
 
   const mutation = useMutation({
-    mutationFn: () => create({ data: { nome, telefone, endereco, logo_url: logoUrl } }),
+    mutationFn: async () => {
+      const result = await create({ data: { nome, telefone, endereco, logo_url: logoUrl } });
+      if (demoOnboardingPending) {
+        completeDemoBusinessRegistration({
+          slug: nome
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-|-$/g, ""),
+          nome: nome.trim(),
+          telefone: telefone.trim(),
+          endereco: endereco.trim(),
+          logo_url: logoUrl.trim() || null,
+        });
+      }
+      return result;
+    },
     onSuccess: async () => {
-      toast.success("Lava-jato criado!");
+      toast.success(
+        demoOnboardingPending ? "Empresa criada no ambiente de teste!" : "Lava-jato criado!",
+      );
       await queryClient.invalidateQueries();
       navigate({ to: "/home", replace: true });
     },
@@ -51,6 +76,12 @@ function Onboarding() {
 
   return (
     <AppShell title="Seu lava-jato">
+      {demoOnboardingPending ? (
+        <div className="mb-5 border border-primary/40 bg-primary/10 p-4 text-xs leading-5 text-primary">
+          AMBIENTE DE TESTE — este cadastro fica salvo no servidor local, mas não cria uma empresa
+          na produção.
+        </div>
+      ) : null}
       <p className="text-sm text-muted-foreground">
         Só precisamos de alguns dados para liberar o atendimento.
       </p>
@@ -67,7 +98,12 @@ function Onboarding() {
         </div>
         <div className="space-y-2">
           <Label htmlFor="tel">Telefone</Label>
-          <Input id="tel" inputMode="tel" value={telefone} onChange={(e) => setTelefone(e.target.value)} />
+          <Input
+            id="tel"
+            inputMode="tel"
+            value={telefone}
+            onChange={(e) => setTelefone(e.target.value)}
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="end">Endereço (opcional)</Label>
@@ -77,7 +113,12 @@ function Onboarding() {
           <Label htmlFor="logo">Link do logo (opcional)</Label>
           <Input id="logo" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} />
         </div>
-        <Button type="submit" size="lg" className="h-13 w-full text-base" disabled={mutation.isPending}>
+        <Button
+          type="submit"
+          size="lg"
+          className="h-13 w-full text-base"
+          disabled={mutation.isPending}
+        >
           {mutation.isPending ? <Loader2 className="size-5 animate-spin" /> : "Criar e começar"}
         </Button>
       </form>

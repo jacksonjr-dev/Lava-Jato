@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { normalizePlate } from "./plate";
+import { calculateFinancialStats, financialPeriod } from "./financial";
 
 export type DB = SupabaseClient<Database>;
 export type Role = Database["public"]["Enums"]["app_role"];
@@ -33,12 +34,9 @@ export async function requireManager(sb: DB, userId: string): Promise<Membership
 }
 
 export const DEFAULT_SERVICES = [
-  { nome: "Lavagem simples", preco: 35, duracao_min: 30 },
-  { nome: "Lavagem completa", preco: 60, duracao_min: 60 },
-  { nome: "Lavagem premium", preco: 90, duracao_min: 90 },
-  { nome: "Higienização interna", preco: 120, duracao_min: 120 },
+  { nome: "Lavagem simples (apenas externa)", preco: 35, duracao_min: 30 },
+  { nome: "Lavagem completa (externa e interna)", preco: 60, duracao_min: 60 },
   { nome: "Polimento", preco: 150, duracao_min: 180 },
-  { nome: "Enceramento", preco: 80, duracao_min: 60 },
 ];
 
 /**
@@ -94,21 +92,20 @@ export async function recognizePlateFromImage(
   }
 }
 
-export async function recalcOrder(sb: DB, orderId: string) {
+export async function recalcOrder(sb: DB, tenantId: string, orderId: string) {
   const { data: items, error: itemsError } = await sb
     .from("service_order_items")
     .select("preco, quantidade")
+    .eq("tenant_id", tenantId)
     .eq("order_id", orderId);
   if (itemsError) throw new Error(itemsError.message);
 
-  const subtotal = (items ?? []).reduce(
-    (acc, i) => acc + Number(i.preco) * (i.quantidade ?? 1),
-    0,
-  );
+  const subtotal = (items ?? []).reduce((acc, i) => acc + Number(i.preco) * (i.quantidade ?? 1), 0);
 
   const { data: order, error: orderError } = await sb
     .from("service_orders")
     .select("desconto, acrescimo")
+    .eq("tenant_id", tenantId)
     .eq("id", orderId)
     .single();
   if (orderError) throw new Error(orderError.message);
@@ -117,17 +114,19 @@ export async function recalcOrder(sb: DB, orderId: string) {
   const { error } = await sb
     .from("service_orders")
     .update({ subtotal, total })
+    .eq("tenant_id", tenantId)
     .eq("id", orderId);
   if (error) throw new Error(error.message);
   return { subtotal, total };
 }
 
-export async function loadOrder(sb: DB, orderId: string) {
+export async function loadOrder(sb: DB, tenantId: string, orderId: string) {
   const { data: order, error } = await sb
     .from("service_orders")
     .select(
       "*, customers(id, nome, telefone), vehicles(id, placa, marca, modelo, cor, ano), service_order_items(*), payments(*), order_photos(*)",
     )
+    .eq("tenant_id", tenantId)
     .eq("id", orderId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -149,6 +148,7 @@ export async function vehicleSummary(sb: DB, tenantId: string, plateInput: strin
   const { data: history, error: histError } = await sb
     .from("service_orders")
     .select("id, numero, status, total, created_at, service_order_items(nome, preco)")
+    .eq("tenant_id", tenantId)
     .eq("vehicle_id", vehicle.id)
     .order("created_at", { ascending: false })
     .limit(20);
@@ -186,80 +186,68 @@ export async function vehicleSummary(sb: DB, tenantId: string, plateInput: strin
 
 export async function dashboardStats(sb: DB, tenantId: string) {
   const now = new Date();
-  const startDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-  const startWeek = new Date(now.getTime() - 6 * 86400000).toISOString();
-  const startMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const period = financialPeriod(now);
+  const paymentWindowStart = new Date(
+    Math.min(period.startWeek.getTime(), period.startMonth.getTime()),
+  ).toISOString();
 
   const { data: payments, error: payError } = await sb
     .from("payments")
-    .select("valor, metodo, pago_em")
+    .select("order_id, valor, metodo, pago_em")
     .eq("tenant_id", tenantId)
-    .gte("pago_em", startMonth);
+    .gte("pago_em", paymentWindowStart)
+    .lt("pago_em", period.nextMonth.toISOString());
   if (payError) throw new Error(payError.message);
-
-  const sum = (from: string) =>
-    (payments ?? [])
-      .filter((p) => p.pago_em >= from)
-      .reduce((acc, p) => acc + Number(p.valor), 0);
-
-  const byMethod = new Map<string, number>();
-  for (const p of payments ?? []) {
-    byMethod.set(p.metodo, (byMethod.get(p.metodo) ?? 0) + Number(p.valor));
-  }
 
   const { data: orders, error: ordError } = await sb
     .from("service_orders")
-    .select("id, status, total, created_at, service_order_items(nome, preco, quantidade)")
+    .select("id, vehicle_id, status, created_at")
     .eq("tenant_id", tenantId)
-    .gte("created_at", startMonth);
+    .gte("created_at", period.startMonth.toISOString())
+    .lt("created_at", period.nextMonth.toISOString());
   if (ordError) throw new Error(ordError.message);
 
-  const list = orders ?? [];
-  const finalizados = list.filter((o) => ["PAGO", "ENTREGUE"].includes(o.status));
-  const emAndamento = list.filter((o) =>
-    ["AGUARDANDO", "EM_LAVAGEM", "EM_FINALIZACAO", "FINALIZADO", "AGUARDANDO_PAGAMENTO"].includes(
-      o.status,
+  const activeStatuses: Database["public"]["Enums"]["order_status"][] = [
+    "AGUARDANDO",
+    "EM_LAVAGEM",
+    "EM_FINALIZACAO",
+    "FINALIZADO",
+    "AGUARDANDO_PAGAMENTO",
+  ];
+  const { count: activeOrders, error: activeError } = await sb
+    .from("service_orders")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId)
+    .in("status", activeStatuses);
+  if (activeError) throw new Error(activeError.message);
+
+  const monthPaymentOrderIds = [
+    ...new Set(
+      (payments ?? [])
+        .filter(
+          (payment) =>
+            payment.pago_em >= period.startMonth.toISOString() &&
+            payment.pago_em < period.nextMonth.toISOString(),
+        )
+        .map((payment) => payment.order_id),
     ),
-  ).length;
-
-  const veiculosDia = list.filter((o) => o.created_at >= startDay).length;
-  const ticket = finalizados.length
-    ? finalizados.reduce((a, o) => a + Number(o.total), 0) / finalizados.length
-    : 0;
-
-  const serviceCount = new Map<string, { qtd: number; valor: number }>();
-  for (const o of list) {
-    for (const i of o.service_order_items ?? []) {
-      const cur = serviceCount.get(i.nome) ?? { qtd: 0, valor: 0 };
-      cur.qtd += i.quantidade ?? 1;
-      cur.valor += Number(i.preco) * (i.quantidade ?? 1);
-      serviceCount.set(i.nome, cur);
-    }
+  ];
+  let paidItems: Array<{ nome: string; preco: number; quantidade: number }> = [];
+  if (monthPaymentOrderIds.length) {
+    const { data: items, error: itemError } = await sb
+      .from("service_order_items")
+      .select("nome, preco, quantidade")
+      .eq("tenant_id", tenantId)
+      .in("order_id", monthPaymentOrderIds);
+    if (itemError) throw new Error(itemError.message);
+    paidItems = items ?? [];
   }
 
-  const last7 = Array.from({ length: 7 }).map((_, idx) => {
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (6 - idx));
-    const next = new Date(d.getTime() + 86400000);
-    const valor = (payments ?? [])
-      .filter((p) => p.pago_em >= d.toISOString() && p.pago_em < next.toISOString())
-      .reduce((acc, p) => acc + Number(p.valor), 0);
-    return { dia: d.toLocaleDateString("pt-BR", { weekday: "short" }), valor };
+  return calculateFinancialStats({
+    now,
+    payments: payments ?? [],
+    monthOrders: orders ?? [],
+    activeOrders: activeOrders ?? 0,
+    paidItems,
   });
-
-  return {
-    faturamentoDia: sum(startDay),
-    faturamentoSemana: sum(startWeek),
-    faturamentoMes: sum(startMonth),
-    veiculosDia,
-    veiculosMes: list.length,
-    ticketMedio: ticket,
-    emAndamento,
-    finalizados: finalizados.length,
-    porMetodo: [...byMethod.entries()].map(([metodo, valor]) => ({ metodo, valor })),
-    topServicos: [...serviceCount.entries()]
-      .map(([nome, v]) => ({ nome, ...v }))
-      .sort((a, b) => b.qtd - a.qtd)
-      .slice(0, 5),
-    last7,
-  };
 }

@@ -1,20 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Camera, Gauge, ShieldCheck } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ArrowRight, Car, ChartNoAxesCombined, CircleUserRound, Wrench } from "lucide-react";
+import { WashBrand } from "@/components/app/wash-brand";
+import { WashHoseBackdrop } from "@/components/app/wash-hose-backdrop";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "LavaPro — Gestão de lava-jato pela placa do carro" },
+      { title: "LavaPro — Operação e acompanhamento do seu lava-jato" },
       {
         name: "description",
         content:
-          "Atenda em segundos: fotografe a placa, encontre o veículo, monte a ordem de serviço e receba o pagamento.",
-      },
-      { property: "og:title", content: "LavaPro — Gestão de lava-jato pela placa do carro" },
-      {
-        property: "og:description",
-        content: "Do reconhecimento da placa ao pagamento, tudo em poucos toques.",
+          "Gestão do lava-jato para o proprietário e acompanhamento de serviços para o cliente.",
       },
     ],
   }),
@@ -23,40 +19,112 @@ export const Route = createFileRoute("/")({
 
 function Landing() {
   return (
-    <div className="min-h-screen bg-hero">
-      <div className="mx-auto flex min-h-screen w-full max-w-lg flex-col justify-between px-5 py-10">
-        <div>
-          <p className="plate text-xs text-primary">LAVAPRO</p>
-          <h1 className="mt-6 text-4xl font-bold leading-tight">
-            O atendimento começa <span className="text-brand">na placa</span>.
-          </h1>
-          <p className="mt-4 text-muted-foreground">
-            Fotografe a placa, o sistema reconhece o veículo, carrega o histórico do cliente e cria
-            a ordem de serviço em segundos.
+    <div className="min-h-screen min-h-dvh bg-hero">
+      <WashHoseBackdrop />
+      <header className="wash-header border-b border-border/60 bg-background/85 px-5 py-4 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between">
+          <WashBrand />
+          <p className="text-[10px] tracking-[0.18em] text-muted-foreground">GESTÃO DE LAVA-JATO</p>
+        </div>
+      </header>
+
+      <main className="page-enter mx-auto max-w-6xl px-5 py-10 md:py-16">
+        <div className="grid items-end gap-8 border-b border-border/60 pb-10 md:grid-cols-[1.2fr_0.8fr]">
+          <div>
+            <p className="text-xs font-semibold text-primary">Gestão e acompanhamento</p>
+            <h1 className="mt-4 max-w-3xl text-[clamp(2.75rem,12vw,6rem)] font-bold leading-[0.9] tracking-[-0.075em]">
+              Do pátio até a entrega.
+            </h1>
+          </div>
+          <p className="max-w-md text-sm leading-6 text-muted-foreground md:justify-self-end">
+            O proprietário controla atendimento e caixa. O cliente acompanha o próprio veículo em
+            tempo real, usando apenas placa e telefone.
           </p>
-
-          <ul className="mt-8 space-y-4 text-sm">
-            <li className="flex items-start gap-3">
-              <Camera className="mt-0.5 size-5 text-primary" />
-              Reconhecimento de placa por foto, com confirmação humana.
-            </li>
-            <li className="flex items-start gap-3">
-              <Gauge className="mt-0.5 size-5 text-primary" />
-              Status do veículo, pagamento e entrega em um só lugar.
-            </li>
-            <li className="flex items-start gap-3">
-              <ShieldCheck className="mt-0.5 size-5 text-primary" />
-              Dados isolados por lava-jato, com permissões por função.
-            </li>
-          </ul>
         </div>
 
-        <div className="mt-10">
-          <Button asChild size="lg" className="h-14 w-full text-base font-semibold">
-            <Link to="/auth">Entrar / Criar conta</Link>
-          </Button>
-        </div>
+        <section className="reveal-stagger mt-6 grid gap-6 md:grid-cols-2">
+          <AccessCard
+            index="01"
+            icon={<ChartNoAxesCombined className="size-8" strokeWidth={1.5} />}
+            eyebrow="PROPRIETÁRIO"
+            title="Controle sua operação."
+            description="Atendimentos, status dos veículos, pagamentos, indicadores e visão financeira em um só painel."
+            to="/auth"
+            action="ENTRAR NA GESTÃO"
+          />
+          <AccessCard
+            index="02"
+            icon={<CircleUserRound className="size-8" strokeWidth={1.5} />}
+            eyebrow="CLIENTE"
+            title="Acompanhe seu carro."
+            description="Consulte o andamento do serviço, o valor e todo o histórico do veículo com placa e telefone."
+            to="/cliente"
+            action="ACESSAR COMO CLIENTE"
+            secondary
+          />
+        </section>
+
+        <section className="mt-6 grid gap-3 sm:grid-cols-3">
+          <Feature icon={<Car className="size-4" />} label="VEÍCULO IDENTIFICADO PELA PLACA" />
+          <Feature icon={<Wrench className="size-4" />} label="STATUS DO SERVIÇO EM ETAPAS" />
+          <Feature
+            icon={<ChartNoAxesCombined className="size-4" />}
+            label="FATURAMENTO E DESEMPENHO"
+          />
+        </section>
+      </main>
+    </div>
+  );
+}
+
+function AccessCard({
+  index,
+  icon,
+  eyebrow,
+  title,
+  description,
+  to,
+  action,
+  secondary,
+}: {
+  index: string;
+  icon: React.ReactNode;
+  eyebrow: string;
+  title: string;
+  description: string;
+  to: "/auth" | "/cliente";
+  action: string;
+  secondary?: boolean;
+}) {
+  return (
+    <article className="interactive-panel group border border-border bg-card p-6 md:p-9">
+      <div className="flex items-start justify-between text-primary">
+        {icon}
+        <span className="text-xs tabular-nums text-muted-foreground">{index} / 02</span>
       </div>
+      <p className="mt-10 text-xs font-semibold text-primary">{eyebrow}</p>
+      <h2 className="mt-3 text-3xl font-bold tracking-[-0.055em] md:text-4xl">{title}</h2>
+      <p className="mt-4 max-w-lg text-sm leading-6 text-muted-foreground">{description}</p>
+      <Link
+        to={to}
+        className={`mt-9 flex h-14 items-center justify-between border px-4 text-sm font-bold transition-colors ${
+          secondary
+            ? "border-border bg-secondary text-secondary-foreground hover:border-primary/50 hover:text-primary"
+            : "border-primary bg-brand text-primary-foreground shadow-glow"
+        }`}
+      >
+        {action}
+        <ArrowRight className="size-5 transition-transform group-hover:translate-x-1" />
+      </Link>
+    </article>
+  );
+}
+
+function Feature({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <div className="interactive-panel flex items-center gap-3 border border-border bg-card p-4 text-[10px] text-muted-foreground">
+      <span className="text-primary">{icon}</span>
+      {label}
     </div>
   );
 }

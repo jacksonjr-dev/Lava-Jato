@@ -2,6 +2,8 @@
 
 Sistema SaaS para gestão de lava-jatos: clientes, veículos, serviços, ordens de serviço, pagamentos e histórico.
 
+A aplicação roda com TanStack Start/Vite e se conecta diretamente ao Supabase configurado pelo proprietário do projeto.
+
 ## Desenvolvimento
 
 Requer Node.js 20+ e npm.
@@ -10,6 +12,18 @@ Requer Node.js 20+ e npm.
 npm install
 npm run dev
 ```
+
+O servidor de desenvolvimento fica disponível, por padrão, em `http://localhost:5173`.
+
+## Acesso de demonstração
+
+Quando o Supabase não estiver disponível, execute:
+
+```sh
+npm run dev:demo
+```
+
+Use `demo@lavapro.local` com a senha `LavaPro@2026`. O modo demonstração é local, utiliza dados fictícios em memória e não deve ser habilitado em produção.
 
 ## Configuração do Supabase
 

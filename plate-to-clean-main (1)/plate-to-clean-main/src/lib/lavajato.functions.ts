@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
-  DEFAULT_SERVICES,
   dashboardStats,
   getMembership,
   loadOrder,
@@ -13,13 +12,278 @@ import {
 } from "./lavajato.server";
 import { normalizePlate } from "./plate";
 import type { Database } from "@/integrations/supabase/types";
+import {
+  demoActiveOrders,
+  demoClientPortal,
+  demoClientPortalByVehicleId,
+  demoCreateBusiness,
+  demoCreateIntake,
+  demoCreateOrder,
+  demoFinancialSummary,
+  demoGetPixSettings,
+  demoGetOrder,
+  demoListVehicles,
+  demoHomeSummary,
+  demoQuickRegister,
+  demoRegisterPayment,
+  demoServices,
+  demoSearchPublicTenants,
+  demoSession,
+  demoUpdateOrderStatus,
+  demoUpdatePixSettings,
+  demoVehicleSummary,
+  isDemoServerMode,
+} from "./demo-data.server";
+import { buildPixPayload } from "./pix";
+import { assertCompatibleServices } from "./service-selection";
+import { assertOrderTransition } from "./order-flow";
+import { matchesBusinessIdentity } from "./business-identity";
 
 type OrderStatus = Database["public"]["Enums"]["order_status"];
 type PaymentMethod = Database["public"]["Enums"]["payment_method"];
 
+function phoneDigits(value: string | null | undefined): string {
+  return (value ?? "").replace(/\D/g, "");
+}
+
+async function buildPortalPix(
+  tenant: {
+    pix_key?: string | null;
+    pix_receiver_name?: string | null;
+    pix_city?: string | null;
+  } | null,
+  orders: Array<{ numero: number; status: string; total: number }>,
+) {
+  const order = orders.find((item) => item.status === "AGUARDANDO_PAGAMENTO");
+  if (
+    !order ||
+    !tenant?.pix_key?.trim() ||
+    !tenant.pix_receiver_name?.trim() ||
+    !tenant.pix_city?.trim()
+  ) {
+    return null;
+  }
+
+  const copiaECola = buildPixPayload({
+    key: tenant.pix_key,
+    receiverName: tenant.pix_receiver_name,
+    city: tenant.pix_city,
+    amount: Number(order.total),
+    transactionId: `OS${order.numero}`,
+  });
+  const { toDataURL } = await import("qrcode");
+  const qrCodeDataUrl = await toDataURL(copiaECola, {
+    width: 320,
+    margin: 2,
+    errorCorrectionLevel: "M",
+  });
+
+  return {
+    orderId: order.numero,
+    amount: Number(order.total),
+    key: tenant.pix_key,
+    receiverName: tenant.pix_receiver_name,
+    copiaECola,
+    qrCodeDataUrl,
+  };
+}
+
+export const searchPublicTenants = createServerFn({ method: "GET" })
+  .validator((data: { query: string }) => data)
+  .handler(async ({ data }) => {
+    const query = data.query.trim().slice(0, 60);
+    if (query.length < 2) return [];
+    if (isDemoServerMode()) return demoSearchPublicTenants(query);
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const safeQuery = query
+      .replace(/[^\p{L}\p{N}\s-]/gu, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (safeQuery.length < 2) return [];
+    const { data: tenants, error } = await supabaseAdmin
+      .from("tenants")
+      .select("id, slug, nome, endereco, logo_url")
+      .eq("public_listing", true)
+      .or(`nome.ilike.%${safeQuery}%,slug.ilike.%${safeQuery.toLowerCase()}%`)
+      .order("nome", { ascending: true })
+      .limit(12);
+    if (error) throw new Error("Não foi possível buscar os lava-jatos.");
+    return tenants ?? [];
+  });
+
+export const clientPortalLogin = createServerFn({ method: "POST" })
+  .validator(
+    (data: { tenantId?: string; placa?: string; telefone?: string; accessToken?: string }) => data,
+  )
+  .handler(async ({ data }) => {
+    const security = await import("./client-portal.server");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let vehicle: Database["public"]["Tables"]["vehicles"]["Row"] & {
+      customers: Pick<
+        Database["public"]["Tables"]["customers"]["Row"],
+        "id" | "nome" | "telefone" | "email"
+      > | null;
+    };
+    let accessToken = data.accessToken?.trim() ?? "";
+
+    if (accessToken) {
+      const claims = security.verifyClientPortalToken(accessToken);
+      if (isDemoServerMode()) {
+        const portal = demoClientPortalByVehicleId(claims.vehicleId, claims.tenantId);
+        return {
+          ...portal,
+          tenant: {
+            id: portal.tenant.id,
+            slug: portal.tenant.slug,
+            nome: portal.tenant.nome,
+            telefone: portal.tenant.telefone,
+            endereco: portal.tenant.endereco,
+          },
+          pix: await buildPortalPix(portal.tenant, portal.orders),
+          accessToken,
+        };
+      }
+      const { data: tokenVehicle, error } = await supabaseAdmin
+        .from("vehicles")
+        .select("*, customers(id, nome, telefone, email)")
+        .eq("id", claims.vehicleId)
+        .eq("tenant_id", claims.tenantId)
+        .maybeSingle();
+      if (error || !tokenVehicle) throw new Error("Acesso do cliente expirado.");
+      vehicle = tokenVehicle;
+    } else {
+      const tenantId = data.tenantId?.trim() ?? "";
+      const placa = normalizePlate(data.placa ?? "");
+      const telefone = phoneDigits(data.telefone);
+      if (!tenantId) throw new Error("Escolha o lava-jato onde o serviço foi realizado.");
+      const attemptKey = security.portalAttemptKey(tenantId, placa, telefone);
+      const plateAttemptKey = security.portalAttemptKey(tenantId, placa, "*");
+      security.assertPortalRateLimit(attemptKey);
+      security.assertPortalRateLimit(plateAttemptKey);
+      if (placa.length !== 7 || telefone.length < 10 || telefone.length > 11) {
+        security.recordPortalFailure(attemptKey);
+        security.recordPortalFailure(plateAttemptKey);
+        throw new Error("Informe a placa e o telefone usados no cadastro.");
+      }
+
+      if (isDemoServerMode()) {
+        try {
+          const portal = demoClientPortal(tenantId, placa, telefone);
+          security.clearPortalFailures(attemptKey);
+          security.clearPortalFailures(plateAttemptKey);
+          accessToken = security.issueClientPortalToken(
+            portal.vehicle.id,
+            portal.vehicle.tenant_id,
+          );
+          return {
+            ...portal,
+            tenant: {
+              id: portal.tenant.id,
+              slug: portal.tenant.slug,
+              nome: portal.tenant.nome,
+              telefone: portal.tenant.telefone,
+              endereco: portal.tenant.endereco,
+            },
+            pix: await buildPortalPix(portal.tenant, portal.orders),
+            accessToken,
+          };
+        } catch {
+          security.recordPortalFailure(attemptKey);
+          security.recordPortalFailure(plateAttemptKey);
+          throw new Error("Placa ou telefone não encontrados.");
+        }
+      }
+
+      const { data: candidates, error: vehicleError } = await supabaseAdmin
+        .from("vehicles")
+        .select("*, customers(id, nome, telefone, email)")
+        .eq("tenant_id", tenantId)
+        .eq("placa_normalizada", placa)
+        .limit(20);
+      if (vehicleError) throw new Error("Não foi possível consultar seus atendimentos.");
+
+      const matches = (candidates ?? []).filter(
+        (candidate) => phoneDigits(candidate.customers?.telefone) === telefone,
+      );
+      if (matches.length !== 1) {
+        security.recordPortalFailure(attemptKey);
+        security.recordPortalFailure(plateAttemptKey);
+        throw new Error(
+          matches.length > 1
+            ? "Existe mais de um cadastro com esses dados. Procure o lava-jato."
+            : "Placa ou telefone não encontrados.",
+        );
+      }
+      vehicle = matches[0]!;
+      const { count: orderCount, error: orderAccessError } = await supabaseAdmin
+        .from("service_orders")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .eq("vehicle_id", vehicle.id);
+      if (orderAccessError) throw new Error("Não foi possível consultar seus atendimentos.");
+      if (!orderCount) {
+        security.recordPortalFailure(attemptKey);
+        security.recordPortalFailure(plateAttemptKey);
+        throw new Error("Placa ou telefone não encontrados.");
+      }
+      security.clearPortalFailures(attemptKey);
+      security.clearPortalFailures(plateAttemptKey);
+      accessToken = security.issueClientPortalToken(vehicle.id, vehicle.tenant_id);
+    }
+
+    const [{ data: tenant, error: tenantError }, { data: orders, error: ordersError }] =
+      await Promise.all([
+        supabaseAdmin
+          .from("tenants")
+          .select("id, slug, nome, telefone, endereco, pix_key, pix_receiver_name, pix_city")
+          .eq("id", vehicle.tenant_id)
+          .single(),
+        supabaseAdmin
+          .from("service_orders")
+          .select(
+            "id, numero, status, total, created_at, finished_at, service_order_items(id, nome, preco, quantidade), payments(id, metodo, valor, pago_em)",
+          )
+          .eq("tenant_id", vehicle.tenant_id)
+          .eq("vehicle_id", vehicle.id)
+          .order("created_at", { ascending: false })
+          .limit(30),
+      ]);
+    if (tenantError || ordersError) {
+      throw new Error("Não foi possível consultar seus atendimentos.");
+    }
+
+    const history = orders ?? [];
+    const pix = await buildPortalPix(tenant, history);
+    return {
+      tenant: tenant
+        ? {
+            id: tenant.id,
+            slug: tenant.slug,
+            nome: tenant.nome,
+            telefone: tenant.telefone,
+            endereco: tenant.endereco,
+          }
+        : null,
+      customer: vehicle.customers,
+      vehicle,
+      orders: history,
+      summary: {
+        totalOrders: history.length,
+        totalSpent: history
+          .filter((order) => ["PAGO", "ENTREGUE"].includes(order.status))
+          .reduce((sum, order) => sum + Number(order.total), 0),
+        lastVisit: history[0]?.created_at ?? null,
+      },
+      pix,
+      accessToken,
+    };
+  });
+
 export const getSession = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    if (isDemoServerMode()) return demoSession();
     const membership = await getMembership(context.supabase, context.userId);
     if (!membership) return { membership: null, tenant: null };
     const { data: tenant, error } = await context.supabase
@@ -31,10 +295,48 @@ export const getSession = createServerFn({ method: "GET" })
     return { membership, tenant };
   });
 
+export const getDemoOwnerLoginHint = createServerFn({ method: "GET" }).handler(() => {
+  if (!isDemoServerMode()) return null;
+  return { businessName: demoSession().tenant.nome };
+});
+
+export const verifyOwnerBusiness = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { businessName: string }) => data)
+  .handler(async ({ data, context }) => {
+    const denyAccess = () => {
+      throw new Error("Nome do lava-jato, e-mail ou senha incorretos.");
+    };
+
+    if (isDemoServerMode()) {
+      const tenant = demoSession().tenant;
+      if (!matchesBusinessIdentity(data.businessName, tenant)) denyAccess();
+      return { ok: true };
+    }
+
+    const membership = await getMembership(context.supabase, context.userId);
+    if (!membership) denyAccess();
+
+    const { data: tenant, error } = await context.supabase
+      .from("tenants")
+      .select("nome, slug")
+      .eq("id", membership!.tenantId)
+      .maybeSingle();
+
+    if (error || !tenant || !matchesBusinessIdentity(data.businessName, tenant)) denyAccess();
+    return { ok: true };
+  });
+
 export const createTenant = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { nome: string; telefone?: string; endereco?: string; logo_url?: string }) => data)
+  .validator(
+    (data: { nome: string; telefone?: string; endereco?: string; logo_url?: string }) => data,
+  )
   .handler(async ({ data, context }) => {
+    if (isDemoServerMode()) {
+      const tenant = demoCreateBusiness(data);
+      return { tenantId: tenant.id };
+    }
     const sb = context.supabase;
     const existing = await getMembership(sb, context.userId);
     if (existing) throw new Error("Você já possui um lava-jato vinculado.");
@@ -45,24 +347,14 @@ export const createTenant = createServerFn({ method: "POST" })
     // id is generated here instead of read back from the insert.
     const tenantId = crypto.randomUUID();
 
-    const { error } = await sb.from("tenants").insert({
-      id: tenantId,
-      nome,
-      telefone: data.telefone?.trim() || null,
-      endereco: data.endereco?.trim() || null,
-      logo_url: data.logo_url?.trim() || null,
+    const { error } = await sb.rpc("create_tenant_atomic", {
+      p_tenant_id: tenantId,
+      p_nome: nome,
+      p_telefone: data.telefone?.trim() || null,
+      p_endereco: data.endereco?.trim() || null,
+      p_logo_url: data.logo_url?.trim() || null,
     });
     if (error) throw new Error(error.message);
-
-    const { error: memberError } = await sb
-      .from("tenant_members")
-      .insert({ tenant_id: tenantId, user_id: context.userId, role: "OWNER" });
-    if (memberError) throw new Error(memberError.message);
-
-    const { error: svcError } = await sb
-      .from("services")
-      .insert(DEFAULT_SERVICES.map((s) => ({ ...s, tenant_id: tenantId })));
-    if (svcError) throw new Error(svcError.message);
 
     return { tenantId };
   });
@@ -70,6 +362,7 @@ export const createTenant = createServerFn({ method: "POST" })
 export const listServices = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    if (isDemoServerMode()) return demoServices;
     const { tenantId } = await requireMembership(context.supabase, context.userId);
     const { data, error } = await context.supabase
       .from("services")
@@ -82,7 +375,9 @@ export const listServices = createServerFn({ method: "GET" })
 
 export const createService = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { nome: string; preco: number; duracao_min?: number; descricao?: string }) => data)
+  .validator(
+    (data: { nome: string; preco: number; duracao_min?: number; descricao?: string }) => data,
+  )
   .handler(async ({ data, context }) => {
     const { tenantId } = await requireManager(context.supabase, context.userId);
     const { data: row, error } = await context.supabase
@@ -102,7 +397,15 @@ export const createService = createServerFn({ method: "POST" })
 
 export const updateService = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { id: string; nome?: string; preco?: number; duracao_min?: number | null; ativo?: boolean }) => data)
+  .validator(
+    (data: {
+      id: string;
+      nome?: string;
+      preco?: number;
+      duracao_min?: number | null;
+      ativo?: boolean;
+    }) => data,
+  )
   .handler(async ({ data, context }) => {
     const { tenantId } = await requireManager(context.supabase, context.userId);
     const patch: Database["public"]["Tables"]["services"]["Update"] = {};
@@ -123,7 +426,7 @@ export const updateService = createServerFn({ method: "POST" })
 
 export const deactivateService = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { id: string }) => data)
+  .validator((data: { id: string }) => data)
   .handler(async ({ data, context }) => {
     const { tenantId } = await requireManager(context.supabase, context.userId);
     const { error } = await context.supabase
@@ -137,8 +440,9 @@ export const deactivateService = createServerFn({ method: "POST" })
 
 export const recognizePlate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { image: string }) => data)
+  .validator((data: { image: string }) => data)
   .handler(async ({ data, context }) => {
+    if (isDemoServerMode()) return { plate: "ABC1D23", confidence: 0.98 };
     await requireMembership(context.supabase, context.userId);
     if (!data.image?.startsWith("data:image/")) throw new Error("Imagem inválida.");
     return recognizePlateFromImage(data.image);
@@ -146,28 +450,92 @@ export const recognizePlate = createServerFn({ method: "POST" })
 
 export const findVehicleByPlate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { placa: string }) => data)
+  .validator((data: { placa: string }) => data)
   .handler(async ({ data, context }) => {
+    if (isDemoServerMode()) return demoVehicleSummary(data.placa);
     const { tenantId } = await requireMembership(context.supabase, context.userId);
     return vehicleSummary(context.supabase, tenantId, data.placa);
   });
 
 export const plateHistory = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { placa: string }) => data)
+  .validator((data: { placa: string }) => data)
   .handler(async ({ data, context }) => {
+    if (isDemoServerMode()) return demoVehicleSummary(data.placa);
     const { tenantId } = await requireMembership(context.supabase, context.userId);
     return vehicleSummary(context.supabase, tenantId, data.placa);
   });
 
+export const listVehicles = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    if (isDemoServerMode()) return demoListVehicles();
+    const { tenantId } = await requireMembership(context.supabase, context.userId);
+    const { data: vehicles, error: vehicleError } = await context.supabase
+      .from("vehicles")
+      .select("id, placa, marca, modelo, cor, created_at, customers(id, nome, telefone)")
+      .eq("tenant_id", tenantId)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (vehicleError) throw new Error(vehicleError.message);
+
+    const vehicleIds = (vehicles ?? []).map((vehicle) => vehicle.id);
+    if (!vehicleIds.length) return [];
+
+    const { data: orders, error: orderError } = await context.supabase
+      .from("service_orders")
+      .select("id, vehicle_id, numero, status, total, created_at, service_order_items(nome)")
+      .eq("tenant_id", tenantId)
+      .in("vehicle_id", vehicleIds)
+      .order("created_at", { ascending: false });
+    if (orderError) throw new Error(orderError.message);
+
+    const ordersByVehicle = new Map<string, NonNullable<typeof orders>>();
+    for (const order of orders ?? []) {
+      if (!order.vehicle_id) continue;
+      const current = ordersByVehicle.get(order.vehicle_id) ?? [];
+      current.push(order);
+      ordersByVehicle.set(order.vehicle_id, current);
+    }
+
+    return (vehicles ?? [])
+      .map((vehicle) => {
+        const vehicleOrders = ordersByVehicle.get(vehicle.id) ?? [];
+        const lastOrder = vehicleOrders[0] ?? null;
+        return {
+          ...vehicle,
+          totalAtendimentos: vehicleOrders.length,
+          ultimoAtendimento: lastOrder
+            ? {
+                id: lastOrder.id,
+                numero: lastOrder.numero,
+                status: lastOrder.status,
+                total: Number(lastOrder.total),
+                created_at: lastOrder.created_at,
+                service_order_items: lastOrder.service_order_items ?? [],
+              }
+            : null,
+        };
+      })
+      .sort((a, b) => {
+        const dateA = a.ultimoAtendimento?.created_at ?? a.created_at;
+        const dateB = b.ultimoAtendimento?.created_at ?? b.created_at;
+        return Date.parse(dateB) - Date.parse(dateA);
+      });
+  });
+
 export const createCustomer = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { nome: string; telefone?: string }) => data)
+  .validator((data: { nome: string; telefone?: string }) => data)
   .handler(async ({ data, context }) => {
     const { tenantId } = await requireMembership(context.supabase, context.userId);
     const { data: row, error } = await context.supabase
       .from("customers")
-      .insert({ tenant_id: tenantId, nome: data.nome.trim(), telefone: data.telefone?.trim() || null })
+      .insert({
+        tenant_id: tenantId,
+        nome: data.nome.trim(),
+        telefone: data.telefone?.trim() || null,
+      })
       .select("*")
       .single();
     if (error) throw new Error(error.message);
@@ -176,8 +544,14 @@ export const createCustomer = createServerFn({ method: "POST" })
 
 export const createVehicle = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
-    (data: { placa: string; customer_id?: string; marca?: string; modelo?: string; cor?: string }) => data,
+  .validator(
+    (data: {
+      placa: string;
+      customer_id?: string;
+      marca?: string;
+      modelo?: string;
+      cor?: string;
+    }) => data,
   )
   .handler(async ({ data, context }) => {
     const { tenantId } = await requireMembership(context.supabase, context.userId);
@@ -202,7 +576,7 @@ export const createVehicle = createServerFn({ method: "POST" })
 
 export const quickRegister = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
+  .validator(
     (data: {
       placa: string;
       cliente_nome: string;
@@ -213,110 +587,126 @@ export const quickRegister = createServerFn({ method: "POST" })
     }) => data,
   )
   .handler(async ({ data, context }) => {
+    if (isDemoServerMode()) return demoQuickRegister(data);
     const sb = context.supabase;
     const { tenantId } = await requireMembership(sb, context.userId);
     const placa = normalizePlate(data.placa);
     if (placa.length < 6) throw new Error("Placa inválida.");
     if (!data.cliente_nome?.trim()) throw new Error("Informe o nome do cliente.");
+    const telefone = phoneDigits(data.cliente_telefone);
+    if (telefone.length < 10 || telefone.length > 11) {
+      throw new Error("Informe um telefone válido com DDD.");
+    }
 
-    const { data: customer, error: cErr } = await sb
-      .from("customers")
-      .insert({
-        tenant_id: tenantId,
-        nome: data.cliente_nome.trim(),
-        telefone: data.cliente_telefone?.trim() || null,
-      })
-      .select("id")
-      .single();
-    if (cErr) throw new Error(cErr.message);
-
-    const { data: vehicle, error: vErr } = await sb
-      .from("vehicles")
-      .insert({
-        tenant_id: tenantId,
-        customer_id: customer.id,
-        placa,
-        placa_normalizada: placa,
-        marca: data.marca?.trim() || null,
-        modelo: data.modelo?.trim() || null,
-        cor: data.cor?.trim() || null,
-      })
-      .select("*")
-      .single();
-    if (vErr) throw new Error(vErr.message);
-
-    return { customerId: customer.id, vehicle };
+    const { data: result, error } = await sb.rpc("quick_register_atomic", {
+      p_placa: placa,
+      p_cliente_nome: data.cliente_nome.trim(),
+      p_cliente_telefone: telefone,
+      p_marca: data.marca?.trim() || null,
+      p_modelo: data.modelo?.trim() || null,
+      p_cor: data.cor?.trim() || null,
+    });
+    if (error) throw new Error(error.message);
+    return result as unknown as {
+      customerId: string;
+      vehicle: Database["public"]["Tables"]["vehicles"]["Row"];
+    };
   });
 
 export const createOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { vehicle_id: string; service_ids: string[]; observacoes?: string }) => data)
+  .validator((data: { vehicle_id: string; service_ids: string[]; observacoes?: string }) => data)
   .handler(async ({ data, context }) => {
+    if (isDemoServerMode()) return demoCreateOrder(data);
     const sb = context.supabase;
     const { tenantId } = await requireMembership(sb, context.userId);
 
-    const { data: vehicle, error: vErr } = await sb
-      .from("vehicles")
-      .select("id, customer_id")
-      .eq("id", data.vehicle_id)
-      .eq("tenant_id", tenantId)
-      .maybeSingle();
-    if (vErr) throw new Error(vErr.message);
-    if (!vehicle) throw new Error("Veículo não encontrado.");
-
     const ids = [...new Set(data.service_ids ?? [])];
     if (ids.length === 0) throw new Error("Selecione ao menos um serviço.");
-
-    const { data: services, error: sErr } = await sb
+    const { data: selectedServices, error: servicesError } = await sb
       .from("services")
-      .select("id, nome, preco")
+      .select("id, nome")
       .eq("tenant_id", tenantId)
       .eq("ativo", true)
       .in("id", ids);
-    if (sErr) throw new Error(sErr.message);
-    if (!services?.length) throw new Error("Serviços inválidos.");
+    if (servicesError) throw new Error(servicesError.message);
+    if ((selectedServices ?? []).length !== ids.length) throw new Error("Serviços inválidos.");
+    assertCompatibleServices(selectedServices ?? []);
+    const { data: orderId, error } = await sb.rpc("create_order_atomic", {
+      p_vehicle_id: data.vehicle_id,
+      p_service_ids: ids,
+      p_observacoes: data.observacoes?.trim() || null,
+    });
+    if (error) throw new Error(error.message);
+    return { orderId };
+  });
 
-    const { data: order, error: oErr } = await sb
-      .from("service_orders")
-      .insert({
-        tenant_id: tenantId,
-        vehicle_id: vehicle.id,
-        customer_id: vehicle.customer_id,
-        employee_id: context.userId,
-        status: "AGUARDANDO",
-        observacoes: data.observacoes?.trim() || null,
-      })
-      .select("*")
-      .single();
-    if (oErr) throw new Error(oErr.message);
+export const createNewCustomerOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(
+    (data: {
+      placa: string;
+      cliente_nome: string;
+      cliente_telefone: string;
+      marca?: string;
+      modelo?: string;
+      cor?: string;
+      service_ids: string[];
+      observacoes?: string;
+    }) => data,
+  )
+  .handler(async ({ data, context }) => {
+    if (isDemoServerMode()) return demoCreateIntake(data);
+    const sb = context.supabase;
+    const { tenantId } = await requireMembership(sb, context.userId);
+    const placa = normalizePlate(data.placa);
+    const telefone = phoneDigits(data.cliente_telefone);
+    const ids = [...new Set(data.service_ids ?? [])];
+    if (placa.length !== 7) throw new Error("Placa inválida.");
+    if (data.cliente_nome.trim().length < 2) throw new Error("Informe o nome do cliente.");
+    if (telefone.length < 10 || telefone.length > 11) {
+      throw new Error("Informe um telefone válido com DDD.");
+    }
+    if (!ids.length) throw new Error("Selecione ao menos um serviço.");
 
-    const { error: iErr } = await sb.from("service_order_items").insert(
-      services.map((s) => ({
-        tenant_id: tenantId,
-        order_id: order.id,
-        service_id: s.id,
-        nome: s.nome,
-        preco: s.preco,
-        quantidade: 1,
-      })),
-    );
-    if (iErr) throw new Error(iErr.message);
+    const { data: selectedServices, error: servicesError } = await sb
+      .from("services")
+      .select("id, nome")
+      .eq("tenant_id", tenantId)
+      .eq("ativo", true)
+      .in("id", ids);
+    if (servicesError) throw new Error(servicesError.message);
+    if ((selectedServices ?? []).length !== ids.length) throw new Error("Serviços inválidos.");
+    assertCompatibleServices(selectedServices ?? []);
 
-    await recalcOrder(sb, order.id);
-    return { orderId: order.id };
+    const { data: result, error } = await sb.rpc("create_intake_atomic", {
+      p_placa: placa,
+      p_cliente_nome: data.cliente_nome.trim(),
+      p_cliente_telefone: telefone,
+      p_marca: data.marca?.trim() || null,
+      p_modelo: data.modelo?.trim() || null,
+      p_cor: data.cor?.trim() || null,
+      p_service_ids: ids,
+      p_observacoes: data.observacoes?.trim() || null,
+    });
+    if (error) throw new Error(error.message);
+    const payload = result as { orderId?: string } | null;
+    if (!payload?.orderId) throw new Error("Não foi possível criar o atendimento.");
+    return payload as { orderId: string; customerId: string; vehicleId: string };
   });
 
 export const getOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { id: string }) => data)
+  .validator((data: { id: string }) => data)
   .handler(async ({ data, context }) => {
-    await requireMembership(context.supabase, context.userId);
-    return loadOrder(context.supabase, data.id);
+    if (isDemoServerMode()) return demoGetOrder(data.id);
+    const { tenantId } = await requireMembership(context.supabase, context.userId);
+    return loadOrder(context.supabase, tenantId, data.id);
   });
 
 export const addOrderItems = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { order_id: string; service_ids: string[] }) => data)
+  .validator((data: { order_id: string; service_ids: string[] }) => data)
   .handler(async ({ data, context }) => {
     const sb = context.supabase;
     const { tenantId } = await requireMembership(sb, context.userId);
@@ -341,7 +731,15 @@ export const addOrderItems = createServerFn({ method: "POST" })
       .eq("ativo", true)
       .in("id", ids);
     if (sErr) throw new Error(sErr.message);
-    if (!services?.length) throw new Error("Serviços inválidos.");
+    if (!services?.length || services.length !== ids.length) throw new Error("Serviços inválidos.");
+
+    const { data: existingItems, error: existingItemsError } = await sb
+      .from("service_order_items")
+      .select("id, nome")
+      .eq("tenant_id", tenantId)
+      .eq("order_id", order.id);
+    if (existingItemsError) throw new Error(existingItemsError.message);
+    assertCompatibleServices([...(existingItems ?? []), ...services]);
 
     const { error } = await sb.from("service_order_items").insert(
       services.map((s) => ({
@@ -354,13 +752,14 @@ export const addOrderItems = createServerFn({ method: "POST" })
       })),
     );
     if (error) throw new Error(error.message);
-    return recalcOrder(sb, order.id);
+    return recalcOrder(sb, tenantId, order.id);
   });
 
 export const updateOrderStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { order_id: string; status: OrderStatus }) => data)
+  .validator((data: { order_id: string; status: OrderStatus }) => data)
   .handler(async ({ data, context }) => {
+    if (isDemoServerMode()) return demoUpdateOrderStatus(data.order_id, data.status);
     const sb = context.supabase;
     const membership = await requireMembership(sb, context.userId);
     if (data.status === "CANCELADO" && membership.role === "EMPLOYEE") {
@@ -375,18 +774,12 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
       .maybeSingle();
     if (curErr) throw new Error(curErr.message);
     if (!current) throw new Error("Atendimento não encontrado.");
-    if (
-      ["PAGO", "ENTREGUE"].includes(current.status) &&
-      !["PAGO", "ENTREGUE"].includes(data.status)
-    ) {
-      throw new Error("Este atendimento já foi pago e não pode voltar de status.");
-    }
-    if (data.status === "PAGO" && current.status !== "PAGO") {
-      throw new Error("Use o registro de pagamento para marcar como pago.");
-    }
+    assertOrderTransition(current.status, data.status, {
+      canCancel: membership.role === "OWNER" || membership.role === "MANAGER",
+    });
 
     const patch: Database["public"]["Tables"]["service_orders"]["Update"] = { status: data.status };
-    if (["FINALIZADO", "PAGO", "ENTREGUE"].includes(data.status)) {
+    if (data.status === "AGUARDANDO_PAGAMENTO") {
       patch.finished_at = new Date().toISOString();
     }
     const { error } = await sb
@@ -400,64 +793,23 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
 
 export const registerPayment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { order_id: string; metodo: PaymentMethod }) => data)
+  .validator((data: { order_id: string; metodo: PaymentMethod }) => data)
   .handler(async ({ data, context }) => {
+    if (isDemoServerMode()) return demoRegisterPayment(data.order_id, data.metodo);
     const sb = context.supabase;
-    const { tenantId } = await requireMembership(sb, context.userId);
-
-    const { data: order, error: oErr } = await sb
-      .from("service_orders")
-      .select("id, status")
-      .eq("id", data.order_id)
-      .eq("tenant_id", tenantId)
-      .maybeSingle();
-    if (oErr) throw new Error(oErr.message);
-    if (!order) throw new Error("Atendimento não encontrado.");
-    if (order.status === "CANCELADO") throw new Error("Este atendimento foi cancelado.");
-    if (["PAGO", "ENTREGUE"].includes(order.status)) {
-      throw new Error("Esta ordem de serviço já possui pagamento registrado.");
-    }
-
-    const { count, error: cErr } = await sb
-      .from("payments")
-      .select("id", { count: "exact", head: true })
-      .eq("tenant_id", tenantId)
-      .eq("order_id", order.id);
-    if (cErr) throw new Error(cErr.message);
-    if ((count ?? 0) > 0) {
-      throw new Error("Esta ordem de serviço já possui pagamento registrado.");
-    }
-
-    const { subtotal: _s, total } = await recalcOrder(sb, data.order_id);
-    void _s;
-
-    const { error } = await sb.from("payments").insert({
-      tenant_id: tenantId,
-      order_id: order.id,
-      valor: total,
-      metodo: data.metodo,
-      user_id: context.userId,
+    await requireMembership(sb, context.userId);
+    const { data: total, error } = await sb.rpc("register_order_payment_atomic", {
+      p_order_id: data.order_id,
+      p_metodo: data.metodo,
     });
-    if (error) {
-      if (error.code === "23505") {
-        throw new Error("Esta ordem de serviço já possui pagamento registrado.");
-      }
-      throw new Error(error.message);
-    }
-
-    const { error: uErr } = await sb
-      .from("service_orders")
-      .update({ status: "PAGO", finished_at: new Date().toISOString() })
-      .eq("id", order.id)
-      .eq("tenant_id", tenantId);
-    if (uErr) throw new Error(uErr.message);
-
-    return { ok: true, total };
+    if (error) throw new Error(error.message);
+    return { ok: true, total: Number(total) };
   });
 
 export const homeSummary = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    if (isDemoServerMode()) return demoHomeSummary();
     const { tenantId } = await requireMembership(context.supabase, context.userId);
     const stats = await dashboardStats(context.supabase, tenantId);
     return {
@@ -465,6 +817,68 @@ export const homeSummary = createServerFn({ method: "GET" })
       veiculosDia: stats.veiculosDia,
       faturamentoDia: stats.faturamentoDia,
     };
+  });
+
+export const financialSummary = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    if (isDemoServerMode()) return demoFinancialSummary();
+    const { tenantId } = await requireManager(context.supabase, context.userId);
+    return dashboardStats(context.supabase, tenantId);
+  });
+
+export const getPixSettings = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    if (isDemoServerMode()) return demoGetPixSettings();
+    const { tenantId } = await requireManager(context.supabase, context.userId);
+    const { data, error } = await context.supabase
+      .from("tenants")
+      .select("pix_key, pix_receiver_name, pix_city")
+      .eq("id", tenantId)
+      .single();
+    if (error) throw new Error(error.message);
+    return data;
+  });
+
+export const updatePixSettings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { pix_key: string; pix_receiver_name: string; pix_city: string }) => data)
+  .handler(async ({ data, context }) => {
+    const settings = {
+      pix_key: data.pix_key?.trim() ?? "",
+      pix_receiver_name: data.pix_receiver_name?.trim() ?? "",
+      pix_city: data.pix_city?.trim() ?? "",
+    };
+    if (!settings.pix_key || settings.pix_key.length > 77) {
+      throw new Error("Informe uma chave PIX válida.");
+    }
+    if (settings.pix_receiver_name.length < 2) {
+      throw new Error("Informe o nome do recebedor.");
+    }
+    if (settings.pix_city.length < 2) {
+      throw new Error("Informe a cidade do recebedor.");
+    }
+
+    // Validate the BR Code fields before persisting them.
+    buildPixPayload({
+      key: settings.pix_key,
+      receiverName: settings.pix_receiver_name,
+      city: settings.pix_city,
+      amount: 0,
+      transactionId: "VALIDACAO",
+    });
+
+    if (isDemoServerMode()) return demoUpdatePixSettings(settings);
+    const { tenantId } = await requireManager(context.supabase, context.userId);
+    const { data: saved, error } = await context.supabase
+      .from("tenants")
+      .update(settings)
+      .eq("id", tenantId)
+      .select("pix_key, pix_receiver_name, pix_city")
+      .single();
+    if (error) throw new Error(error.message);
+    return saved;
   });
 
 export const listTeam = createServerFn({ method: "GET" })
@@ -482,6 +896,7 @@ export const listTeam = createServerFn({ method: "GET" })
 export const listActiveOrders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    if (isDemoServerMode()) return demoActiveOrders();
     const { tenantId } = await requireMembership(context.supabase, context.userId);
     const { data, error } = await context.supabase
       .from("service_orders")

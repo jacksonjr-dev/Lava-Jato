@@ -15,6 +15,7 @@ import {
   type OrderStatus,
   type PaymentMethod,
 } from "@/lib/plate";
+import { allowedManualTransitions } from "@/lib/order-flow";
 
 export const Route = createFileRoute("/_authenticated/os/$id")({
   head: () => ({
@@ -22,7 +23,10 @@ export const Route = createFileRoute("/_authenticated/os/$id")({
       { title: "Ordem de serviço — LavaPro" },
       { name: "description", content: "Acompanhe o status, o pagamento e a entrega do veículo." },
       { property: "og:title", content: "Ordem de serviço — LavaPro" },
-      { property: "og:description", content: "Acompanhe o status, o pagamento e a entrega do veículo." },
+      {
+        property: "og:description",
+        content: "Acompanhe o status, o pagamento e a entrega do veículo.",
+      },
     ],
   }),
   component: OrderPage,
@@ -100,8 +104,8 @@ function OrderPage() {
             <div className="mt-3 flex flex-wrap gap-2">
               {ORDER_STATUSES.map((s) => {
                 const locked =
-                  (isPaid && !["PAGO", "ENTREGUE"].includes(s)) ||
-                  (s === "PAGO" && order.status !== "PAGO");
+                  s === order.status ||
+                  !allowedManualTransitions(order.status as OrderStatus).includes(s);
                 return (
                   <button
                     key={s}
@@ -134,7 +138,11 @@ function OrderPage() {
                     disabled={payMutation.isPending}
                     onClick={() => payMutation.mutate(m)}
                   >
-                    {payMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : PAYMENT_LABEL[m]}
+                    {payMutation.isPending ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      PAYMENT_LABEL[m]
+                    )}
                   </Button>
                 ))}
               </div>
