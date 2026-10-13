@@ -20,6 +20,7 @@ graphify-out
 .data/
 .playwright-cli/
 output/playwright/
+supabase/.temp/
 
 # Wrangler / Cloudflare
 .wrangler/

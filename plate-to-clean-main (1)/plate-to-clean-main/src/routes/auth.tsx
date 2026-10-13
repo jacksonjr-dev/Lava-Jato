@@ -99,7 +99,11 @@ function AuthPage() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         try {
-          await verifyBusiness({ data: { businessName } });
+          const verification = await verifyBusiness({ data: { businessName } });
+          if (verification.needsOnboarding) {
+            navigate({ to: "/onboarding", replace: true });
+            return;
+          }
         } catch {
           await supabase.auth.signOut();
           throw new Error("Nome do lava-jato, e-mail ou senha incorretos.");

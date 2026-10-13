@@ -311,11 +311,11 @@ export const verifyOwnerBusiness = createServerFn({ method: "POST" })
     if (isDemoServerMode()) {
       const tenant = demoSession().tenant;
       if (!matchesBusinessIdentity(data.businessName, tenant)) denyAccess();
-      return { ok: true };
+      return { ok: true, needsOnboarding: false };
     }
 
     const membership = await getMembership(context.supabase, context.userId);
-    if (!membership) denyAccess();
+    if (!membership) return { ok: true, needsOnboarding: true };
 
     const { data: tenant, error } = await context.supabase
       .from("tenants")
@@ -324,7 +324,7 @@ export const verifyOwnerBusiness = createServerFn({ method: "POST" })
       .maybeSingle();
 
     if (error || !tenant || !matchesBusinessIdentity(data.businessName, tenant)) denyAccess();
-    return { ok: true };
+    return { ok: true, needsOnboarding: false };
   });
 
 export const createTenant = createServerFn({ method: "POST" })
