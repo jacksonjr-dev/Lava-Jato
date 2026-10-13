@@ -10,12 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   createOrder,
+  createNewCustomerOrder,
   findVehicleByPlate,
   listServices,
-  quickRegister,
   recognizePlate,
 } from "@/lib/lavajato.functions";
 import { brl, dateBR, normalizePlate } from "@/lib/plate";
+import { isWashService, toggleServiceSelection } from "@/lib/service-selection";
 
 export const Route = createFileRoute("/_authenticated/atendimento/novo")({
   head: () => ({
@@ -37,15 +38,17 @@ function NovoAtendimento() {
 
   const recognizeFn = useServerFn(recognizePlate);
   const findFn = useServerFn(findVehicleByPlate);
-  const quickFn = useServerFn(quickRegister);
   const servicesFn = useServerFn(listServices);
   const createOrderFn = useServerFn(createOrder);
+  const createNewCustomerOrderFn = useServerFn(createNewCustomerOrder);
 
   const [step, setStep] = useState<Step>("capture");
   const [plate, setPlate] = useState("");
   const [confidence, setConfidence] = useState<number | null>(null);
   const [vehicleId, setVehicleId] = useState<string | null>(null);
-  const [summary, setSummary] = useState<Awaited<ReturnType<typeof findVehicleByPlate>> | null>(null);
+  const [summary, setSummary] = useState<Awaited<ReturnType<typeof findVehicleByPlate>> | null>(
+    null,
+  );
   const [selected, setSelected] = useState<string[]>([]);
 
   const [cliente, setCliente] = useState({ nome: "", telefone: "" });
@@ -91,28 +94,21 @@ function NovoAtendimento() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const quickMutation = useMutation({
-    mutationFn: () =>
-      quickFn({
-        data: {
-          placa: plate,
-          cliente_nome: cliente.nome,
-          cliente_telefone: cliente.telefone,
-          marca: veic.marca,
-          modelo: veic.modelo,
-          cor: veic.cor,
-        },
-      }),
-    onSuccess: (res) => {
-      setVehicleId(res.vehicle.id);
-      toast.success("Veículo cadastrado.");
-      setStep("services");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
   const orderMutation = useMutation({
-    mutationFn: () => createOrderFn({ data: { vehicle_id: vehicleId!, service_ids: selected } }),
+    mutationFn: () =>
+      vehicleId
+        ? createOrderFn({ data: { vehicle_id: vehicleId, service_ids: selected } })
+        : createNewCustomerOrderFn({
+            data: {
+              placa: plate,
+              cliente_nome: cliente.nome,
+              cliente_telefone: cliente.telefone,
+              marca: veic.marca,
+              modelo: veic.modelo,
+              cor: veic.cor,
+              service_ids: selected,
+            },
+          }),
     onSuccess: (res) => navigate({ to: "/os/$id", params: { id: res.orderId } }),
     onError: (e: Error) => toast.error(e.message),
   });
@@ -226,7 +222,10 @@ function NovoAtendimento() {
               </div>
             </div>
           </div>
-          <Button className="h-14 w-full text-base font-semibold" onClick={() => setStep("services")}>
+          <Button
+            className="h-14 w-full text-base font-semibold"
+            onClick={() => setStep("services")}
+          >
             INICIAR ATENDIMENTO
           </Button>
         </div>
@@ -237,7 +236,16 @@ function NovoAtendimento() {
           className="space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
-            quickMutation.mutate();
+            const phone = cliente.telefone.replace(/\D/g, "");
+            if (cliente.nome.trim().length < 2) {
+              toast.error("Informe o nome do cliente.");
+              return;
+            }
+            if (phone.length < 10 || phone.length > 11) {
+              toast.error("Informe um telefone válido com DDD.");
+              return;
+            }
+            setStep("services");
           }}
         >
           <div className="rounded-2xl border border-warning/40 bg-card p-4 text-sm">
@@ -246,28 +254,52 @@ function NovoAtendimento() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="cnome">Nome do cliente</Label>
-            <Input id="cnome" value={cliente.nome} onChange={(e) => setCliente({ ...cliente, nome: e.target.value })} required />
+            <Input
+              id="cnome"
+              value={cliente.nome}
+              onChange={(e) => setCliente({ ...cliente, nome: e.target.value })}
+              required
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="ctel">Telefone</Label>
-            <Input id="ctel" inputMode="tel" value={cliente.telefone} onChange={(e) => setCliente({ ...cliente, telefone: e.target.value })} />
+            <Input
+              id="ctel"
+              inputMode="tel"
+              value={cliente.telefone}
+              onChange={(e) => setCliente({ ...cliente, telefone: e.target.value })}
+              required
+              minLength={10}
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="marca">Marca</Label>
-              <Input id="marca" value={veic.marca} onChange={(e) => setVeic({ ...veic, marca: e.target.value })} />
+              <Input
+                id="marca"
+                value={veic.marca}
+                onChange={(e) => setVeic({ ...veic, marca: e.target.value })}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="modelo">Modelo</Label>
-              <Input id="modelo" value={veic.modelo} onChange={(e) => setVeic({ ...veic, modelo: e.target.value })} />
+              <Input
+                id="modelo"
+                value={veic.modelo}
+                onChange={(e) => setVeic({ ...veic, modelo: e.target.value })}
+              />
             </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="cor">Cor</Label>
-            <Input id="cor" value={veic.cor} onChange={(e) => setVeic({ ...veic, cor: e.target.value })} />
+            <Input
+              id="cor"
+              value={veic.cor}
+              onChange={(e) => setVeic({ ...veic, cor: e.target.value })}
+            />
           </div>
-          <Button type="submit" className="h-14 w-full text-base font-semibold" disabled={quickMutation.isPending}>
-            {quickMutation.isPending ? <Loader2 className="size-5 animate-spin" /> : "CADASTRAR E ATENDER"}
+          <Button type="submit" className="h-14 w-full text-base font-semibold">
+            CONTINUAR PARA SERVIÇOS
           </Button>
         </form>
       )}
@@ -275,7 +307,12 @@ function NovoAtendimento() {
       {step === "services" && (
         <div className="space-y-4">
           <p className="plate text-xl">{plate}</p>
-          {services.isLoading && <p className="text-sm text-muted-foreground">Carregando serviços…</p>}
+          <p className="text-xs leading-5 text-muted-foreground">
+            Escolha uma lavagem. O polimento pode ser contratado sozinho ou junto da lavagem.
+          </p>
+          {services.isLoading && (
+            <p className="text-sm text-muted-foreground">Carregando serviços…</p>
+          )}
           <div className="space-y-2">
             {active.map((s) => {
               const on = selected.includes(s.id);
@@ -283,14 +320,20 @@ function NovoAtendimento() {
                 <button
                   key={s.id}
                   type="button"
-                  onClick={() =>
-                    setSelected(on ? selected.filter((i) => i !== s.id) : [...selected, s.id])
-                  }
+                  aria-pressed={on}
+                  onClick={() => setSelected(toggleServiceSelection(selected, s, active))}
                   className={`flex w-full items-center justify-between rounded-2xl border p-4 text-left transition ${
                     on ? "border-primary bg-primary/10" : "border-border/60 bg-card"
                   }`}
                 >
-                  <span className="font-medium">{s.nome}</span>
+                  <span className="min-w-0">
+                    <span className="block font-medium">{s.nome}</span>
+                    {isWashService(s.nome) && (
+                      <span className="mt-1 block text-[11px] text-muted-foreground">
+                        Uma opção de lavagem por atendimento
+                      </span>
+                    )}
+                  </span>
                   <span className="text-sm">{brl(s.preco)}</span>
                 </button>
               );
@@ -308,10 +351,16 @@ function NovoAtendimento() {
 
           <Button
             className="h-14 w-full text-base font-semibold"
-            disabled={!selected.length || !vehicleId || orderMutation.isPending}
+            disabled={!selected.length || orderMutation.isPending}
             onClick={() => orderMutation.mutate()}
           >
-            {orderMutation.isPending ? <Loader2 className="size-5 animate-spin" /> : "CRIAR ORDEM DE SERVIÇO"}
+            {orderMutation.isPending ? (
+              <Loader2 className="size-5 animate-spin" />
+            ) : vehicleId ? (
+              "CRIAR ORDEM DE SERVIÇO"
+            ) : (
+              "CADASTRAR CLIENTE E CRIAR ORDEM"
+            )}
           </Button>
         </div>
       )}

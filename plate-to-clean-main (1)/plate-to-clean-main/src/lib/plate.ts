@@ -16,22 +16,20 @@ export function isValidPlate(input: string): boolean {
 export const ORDER_STATUSES = [
   "AGUARDANDO",
   "EM_LAVAGEM",
-  "EM_FINALIZACAO",
-  "FINALIZADO",
   "AGUARDANDO_PAGAMENTO",
   "PAGO",
   "ENTREGUE",
   "CANCELADO",
 ] as const;
 
-export type OrderStatus = (typeof ORDER_STATUSES)[number];
+export type OrderStatus = (typeof ORDER_STATUSES)[number] | "EM_FINALIZACAO" | "FINALIZADO";
 
 export const STATUS_LABEL: Record<OrderStatus, string> = {
   AGUARDANDO: "Aguardando",
-  EM_LAVAGEM: "Em lavagem",
-  EM_FINALIZACAO: "Finalização",
-  FINALIZADO: "Finalizado",
-  AGUARDANDO_PAGAMENTO: "Aguard. pagamento",
+  EM_LAVAGEM: "Em serviço",
+  EM_FINALIZACAO: "Em serviço",
+  FINALIZADO: "Pronto para retirada",
+  AGUARDANDO_PAGAMENTO: "Pronto para retirada",
   PAGO: "Pago",
   ENTREGUE: "Entregue",
   CANCELADO: "Cancelado",
@@ -40,8 +38,6 @@ export const STATUS_LABEL: Record<OrderStatus, string> = {
 export const KANBAN_STATUSES: OrderStatus[] = [
   "AGUARDANDO",
   "EM_LAVAGEM",
-  "EM_FINALIZACAO",
-  "FINALIZADO",
   "AGUARDANDO_PAGAMENTO",
   "PAGO",
 ];

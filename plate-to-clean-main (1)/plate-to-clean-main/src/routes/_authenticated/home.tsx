@@ -45,10 +45,10 @@ function Home() {
   });
 
   return (
-    <AppShell title={sessionQuery.data?.tenant?.nome ?? "LavaPro"}>
+    <AppShell title="Operação">
       <Button
         asChild
-        className="h-28 w-full rounded-3xl bg-brand text-lg font-bold text-primary-foreground shadow-glow"
+        className="h-24 w-full bg-brand text-lg font-bold text-primary-foreground md:h-28"
       >
         <Link to="/atendimento/novo">
           <Camera className="mr-2 size-7" />
@@ -56,9 +56,17 @@ function Home() {
         </Link>
       </Button>
 
-      <div className="mt-5 grid grid-cols-3 gap-3">
-        <Stat icon={<Clock className="size-4" />} label="Em andamento" value={String(summaryQuery.data?.emAndamento ?? "—")} />
-        <Stat icon={<Car className="size-4" />} label="Veículos hoje" value={String(summaryQuery.data?.veiculosDia ?? "—")} />
+      <div className="reveal-stagger mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Stat
+          icon={<Clock className="size-4" />}
+          label="Em andamento"
+          value={String(summaryQuery.data?.emAndamento ?? "—")}
+        />
+        <Stat
+          icon={<Car className="size-4" />}
+          label="Veículos hoje"
+          value={String(summaryQuery.data?.veiculosDia ?? "—")}
+        />
         <Stat
           icon={<Wallet className="size-4" />}
           label="Hoje"
@@ -73,7 +81,7 @@ function Home() {
         </Link>
       </div>
 
-      <div className="mt-3 space-y-2">
+      <div className="reveal-stagger mt-3 grid gap-2 lg:grid-cols-2">
         {ordersQuery.isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
         {ordersQuery.data?.length === 0 && (
           <p className="text-sm text-muted-foreground">Nenhum atendimento aberto.</p>
@@ -83,7 +91,7 @@ function Home() {
             key={o.id}
             to="/os/$id"
             params={{ id: o.id }}
-            className="flex items-center justify-between rounded-2xl border border-border/60 bg-card p-4 shadow-card"
+            className="interactive-panel flex items-center justify-between border border-border bg-card p-4"
           >
             <div>
               <p className="plate text-base">{o.vehicles?.placa ?? "—"}</p>
@@ -101,7 +109,7 @@ function Home() {
 
 function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-border/60 bg-card p-3">
+    <div className="interactive-panel border border-border bg-card p-4">
       <div className="flex items-center gap-1 text-muted-foreground">{icon}</div>
       <p className="mt-2 text-lg font-bold leading-none">{value}</p>
       <p className="mt-1 text-[11px] text-muted-foreground">{label}</p>

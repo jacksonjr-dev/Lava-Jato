@@ -14,8 +14,12 @@ dist-ssr
 .vinxi
 .tanstack/**
 .nitro
+graphify-out
 *.local
 .env
+.data/
+.playwright-cli/
+output/playwright/
 
 # Wrangler / Cloudflare
 .wrangler/
