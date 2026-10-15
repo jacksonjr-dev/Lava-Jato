@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { normalizePlate } from "./plate";
+import { parsePlateResponse, type PlateRecognition } from "./plate-recognition";
 import { calculateFinancialStats, financialPeriod } from "./financial";
 import { assertFeature, resolveSubscription, type Feature, type Subscription } from "./plans";
 
@@ -66,37 +67,50 @@ export const DEFAULT_SERVICES = [
   { nome: "Polimento", preco: 150, duracao_min: 180 },
 ];
 
+const PLATE_READ_TIMEOUT_MS = 20_000;
+
 /**
  * Camada de abstração de reconhecimento de placa (LPR/OCR).
  * Troque a implementação interna sem alterar o restante da aplicação.
  */
-export async function recognizePlateFromImage(
-  imageDataUrl: string,
-): Promise<{ plate: string; confidence: number }> {
+export async function recognizePlateFromImage(imageDataUrl: string): Promise<PlateRecognition> {
   const apiKey = process.env["OPENAI_API_KEY"];
   if (!apiKey) throw new Error("Serviço de reconhecimento indisponível.");
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: process.env["OPENAI_VISION_MODEL"] ?? "gpt-4.1-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            'Você lê placas de veículos brasileiros em fotos. Responda SOMENTE com JSON no formato {"plate":"ABC1D23","confidence":0.0-1.0}. Se não conseguir ler, use {"plate":"","confidence":0}.',
-        },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: "Qual é a placa deste veículo?" },
-            { type: "image_url", image_url: { url: imageDataUrl } },
-          ],
-        },
-      ],
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(PLATE_READ_TIMEOUT_MS),
+      body: JSON.stringify({
+        model: process.env["OPENAI_VISION_MODEL"] ?? "gpt-4.1-mini",
+        temperature: 0,
+        max_tokens: 60,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content:
+              'Você lê placas de veículos brasileiros em fotos (padrão antigo ABC1234 ou Mercosul ABC1D23). Responda SOMENTE com JSON no formato {"plate":"ABC1D23","confidence":0.0-1.0}, sem espaços nem hífen na placa. Se não houver placa legível, responda {"plate":"","confidence":0}.',
+          },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Qual é a placa deste veículo?" },
+              { type: "image_url", image_url: { url: imageDataUrl, detail: "high" } },
+            ],
+          },
+        ],
+      }),
+    });
+  } catch (error) {
+    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
+      throw new Error("A leitura demorou demais. Digite a placa manualmente.");
+    }
+    console.error("[LPR] falha de rede", error);
+    throw new Error("Não foi possível ler a placa. Digite manualmente.");
+  }
 
   if (res.status === 429) throw new Error("Muitas leituras seguidas. Aguarde alguns segundos.");
   if (!res.ok) {
@@ -105,18 +119,7 @@ export async function recognizePlateFromImage(
   }
 
   const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const raw = json.choices?.[0]?.message?.content ?? "";
-  const match = raw.match(/\{[\s\S]*\}/);
-  if (!match) return { plate: "", confidence: 0 };
-  try {
-    const parsed = JSON.parse(match[0]) as { plate?: string; confidence?: number };
-    return {
-      plate: normalizePlate(parsed.plate ?? ""),
-      confidence: Math.max(0, Math.min(1, Number(parsed.confidence ?? 0))),
-    };
-  } catch {
-    return { plate: "", confidence: 0 };
-  }
+  return { ...parsePlateResponse(json.choices?.[0]?.message?.content ?? ""), simulated: false };
 }
 
 export async function loadOrder(sb: DB, tenantId: string, orderId: string) {

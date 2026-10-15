@@ -66,6 +66,7 @@ function NovoAtendimento() {
   const [direction, setDirection] = useState(1);
   const [plate, setPlate] = useState("");
   const [confidence, setConfidence] = useState<number | null>(null);
+  const [simulated, setSimulated] = useState(false);
   const [vehicleId, setVehicleId] = useState<string | null>(null);
   const [summary, setSummary] = useState<Awaited<ReturnType<typeof findVehicleByPlate>> | null>(
     null,
@@ -93,12 +94,13 @@ function NovoAtendimento() {
     mutationFn: (image: string) => recognizeFn({ data: { image } }),
     onSuccess: (res) => {
       if (!res.plate) {
-        toast.error("Não consegui ler a placa. Digite manualmente.");
+        toast.error("Não encontrei uma placa válida na foto. Digite manualmente.");
         setConfidence(null);
         return;
       }
       setPlate(res.plate);
       setConfidence(res.confidence);
+      setSimulated(res.simulated);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -217,8 +219,9 @@ function NovoAtendimento() {
                           className="flex items-center gap-1.5 text-xs text-primary"
                         >
                           <Sparkles className="size-3.5" />
-                          Lida pela foto · confiança {Math.round(confidence * 100)}%. Confira antes
-                          de seguir.
+                          {simulated
+                            ? "Leitura simulada (modo demonstração): a foto não é analisada."
+                            : `Lida pela foto · confiança ${Math.round(confidence * 100)}%. Confira antes de seguir.`}
                         </m.p>
                       )}
                     </AnimatePresence>

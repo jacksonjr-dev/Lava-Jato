@@ -679,7 +679,8 @@ export const recognizePlate = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     if (isDemoServerMode()) {
       assertDemoFeature("placa_foto");
-      return { plate: "ABC1D23", confidence: 0.98 };
+      // Sem leitura real no modo demonstração: a placa é sempre a mesma.
+      return { plate: "ABC1D23", confidence: 0.98, simulated: true };
     }
     const { tenantId } = await requireMembership(context.supabase, context.userId);
     await requireFeature(context.supabase, tenantId, "placa_foto");
