@@ -1,14 +1,29 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { Camera, Keyboard, Loader2, Lock } from "lucide-react";
+import { AnimatePresence, m } from "motion/react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Camera,
+  Check,
+  History,
+  Loader2,
+  Lock,
+  Phone,
+  Sparkles,
+  UserPlus,
+} from "lucide-react";
 import { AppShell } from "@/components/app/shell";
+import { CountUp } from "@/components/app/motion";
+import { PlateBadge, PlateInput } from "@/components/app/plate-badge";
 import { useFeature } from "@/hooks/use-plan";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   createOrder,
   createNewCustomerOrder,
@@ -31,7 +46,10 @@ export const Route = createFileRoute("/_authenticated/atendimento/novo")({
   component: NovoAtendimento,
 });
 
-type Step = "capture" | "confirm" | "vehicle" | "quick" | "services";
+type Step = "plate" | "vehicle" | "quick" | "services";
+
+const STAGES = ["Placa", "Cliente", "Serviços"] as const;
+const STAGE_OF: Record<Step, number> = { plate: 0, vehicle: 1, quick: 1, services: 2 };
 
 function NovoAtendimento() {
   const navigate = useNavigate();
@@ -44,7 +62,8 @@ function NovoAtendimento() {
   const createOrderFn = useServerFn(createOrder);
   const createNewCustomerOrderFn = useServerFn(createNewCustomerOrder);
 
-  const [step, setStep] = useState<Step>("capture");
+  const [step, setStep] = useState<Step>("plate");
+  const [direction, setDirection] = useState(1);
   const [plate, setPlate] = useState("");
   const [confidence, setConfidence] = useState<number | null>(null);
   const [vehicleId, setVehicleId] = useState<string | null>(null);
@@ -52,14 +71,22 @@ function NovoAtendimento() {
     null,
   );
   const [selected, setSelected] = useState<string[]>([]);
-
   const [cliente, setCliente] = useState({ nome: "", telefone: "" });
   const [veic, setVeic] = useState({ marca: "", modelo: "", cor: "" });
+
+  function go(next: Step) {
+    setDirection(STAGE_OF[next] >= STAGE_OF[step] ? 1 : -1);
+    setStep(next);
+  }
+
+  function goBack() {
+    if (step === "services") go(vehicleId ? "vehicle" : "quick");
+    else if (step === "vehicle" || step === "quick") go("plate");
+  }
 
   const services = useQuery({
     queryKey: ["services"],
     queryFn: () => servicesFn(),
-    enabled: step === "services",
   });
 
   const recognizeMutation = useMutation({
@@ -68,17 +95,12 @@ function NovoAtendimento() {
       if (!res.plate) {
         toast.error("Não consegui ler a placa. Digite manualmente.");
         setConfidence(null);
-        setStep("confirm");
         return;
       }
       setPlate(res.plate);
       setConfidence(res.confidence);
-      setStep("confirm");
     },
-    onError: (e: Error) => {
-      toast.error(e.message);
-      setStep("confirm");
-    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const findMutation = useMutation({
@@ -88,9 +110,10 @@ function NovoAtendimento() {
       setPlate(res.placa);
       if (res.vehicle) {
         setVehicleId(res.vehicle.id);
-        setStep("vehicle");
+        go("vehicle");
       } else {
-        setStep("quick");
+        setVehicleId(null);
+        go("quick");
       }
     },
     onError: (e: Error) => toast.error(e.message),
@@ -111,7 +134,10 @@ function NovoAtendimento() {
               service_ids: selected,
             },
           }),
-    onSuccess: (res) => navigate({ to: "/os/$id", params: { id: res.orderId } }),
+    onSuccess: (res) => {
+      toast.success("Atendimento criado!");
+      navigate({ to: "/os/$id", params: { id: res.orderId } });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -127,269 +153,455 @@ function NovoAtendimento() {
   const subtotal = active
     .filter((s) => selected.includes(s.id))
     .reduce((acc, s) => acc + Number(s.preco), 0);
+  const stage = STAGE_OF[step];
 
   return (
     <AppShell title="Novo atendimento" back="/home">
-      {step === "capture" && (
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Aponte a câmera para a placa do veículo. Você poderá confirmar antes de continuar.
-          </p>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void onFile(f);
-            }}
-          />
-          {leituraPorFoto ? (
-            <Button
-              className="h-28 w-full rounded-3xl bg-brand text-lg font-bold text-primary-foreground shadow-glow"
-              onClick={() => fileRef.current?.click()}
-              disabled={recognizeMutation.isPending}
+      <div className="mx-auto max-w-xl">
+        <Progress stage={stage} />
+
+        {step !== "plate" && (
+          <button
+            type="button"
+            onClick={goBack}
+            className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-primary"
+          >
+            <ArrowLeft className="size-4" /> Voltar
+          </button>
+        )}
+
+        <div className="relative mt-4">
+          <AnimatePresence mode="wait" custom={direction} initial={false}>
+            <m.div
+              key={step}
+              custom={direction}
+              variants={{
+                enter: (dir: number) => ({ opacity: 0, x: dir * 40 }),
+                center: { opacity: 1, x: 0 },
+                exit: (dir: number) => ({ opacity: 0, x: dir * -40 }),
+              }}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ type: "spring", stiffness: 420, damping: 36 }}
             >
-              {recognizeMutation.isPending ? (
-                <Loader2 className="size-7 animate-spin" />
-              ) : (
-                <>
-                  <Camera className="mr-2 size-7" /> FOTOGRAFAR PLACA
-                </>
-              )}
-            </Button>
-          ) : (
-            <Link
-              to="/planos"
-              className="flex h-28 w-full flex-col items-center justify-center gap-2 rounded-3xl border border-border bg-card text-center text-sm text-muted-foreground hover:border-primary/50 hover:text-primary"
-            >
-              <span className="flex items-center gap-2 font-bold">
-                <Lock className="size-5" /> LEITURA DA PLACA PELA FOTO
-              </span>
-              <span className="text-xs">Disponível no plano Max · ver planos</span>
-            </Link>
-          )}
-          <Button
-            variant="secondary"
-            className="h-13 w-full text-base"
-            onClick={() => {
-              setConfidence(null);
-              setStep("confirm");
-            }}
-          >
-            <Keyboard className="mr-2 size-5" /> DIGITAR PLACA MANUALMENTE
-          </Button>
-        </div>
-      )}
+              {step === "plate" && (
+                <div className="space-y-6">
+                  <StepTitle
+                    title="Qual é a placa?"
+                    text="Digite a placa ou tire uma foto. O sistema busca o cliente e o histórico."
+                  />
+                  <form
+                    className="flex flex-col items-center gap-3"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      if (plate.length >= 6) findMutation.mutate(plate);
+                    }}
+                  >
+                    <PlateInput
+                      value={plate}
+                      onChange={(e) => {
+                        setPlate(normalizePlate(e.target.value).slice(0, 7));
+                        setConfidence(null);
+                      }}
+                      placeholder="ABC1D23"
+                      aria-label="Placa do veículo"
+                      autoFocus
+                    />
+                    <AnimatePresence>
+                      {confidence !== null && (
+                        <m.p
+                          initial={{ opacity: 0, y: -6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0 }}
+                          className="flex items-center gap-1.5 text-xs text-primary"
+                        >
+                          <Sparkles className="size-3.5" />
+                          Lida pela foto · confiança {Math.round(confidence * 100)}%. Confira antes
+                          de seguir.
+                        </m.p>
+                      )}
+                    </AnimatePresence>
+                    <Button
+                      type="submit"
+                      className="mt-2 h-14 w-full max-w-sm rounded-2xl text-base font-bold shadow-glow"
+                      disabled={plate.length < 6 || findMutation.isPending}
+                    >
+                      {findMutation.isPending ? (
+                        <Loader2 className="size-5 animate-spin" />
+                      ) : (
+                        <>
+                          CONTINUAR <ArrowRight className="size-5" />
+                        </>
+                      )}
+                    </Button>
+                  </form>
 
-      {step === "confirm" && (
-        <div className="space-y-5">
-          <div className="rounded-3xl border border-border/60 bg-card p-5 text-center shadow-card">
-            <p className="text-xs text-muted-foreground">Placa identificada</p>
-            <Input
-              value={plate}
-              onChange={(e) => setPlate(normalizePlate(e.target.value).slice(0, 7))}
-              className="plate mt-3 h-16 text-center text-2xl uppercase"
-              placeholder="ABC1D23"
-              autoFocus
-            />
-            {confidence !== null && (
-              <p className="mt-3 text-xs text-muted-foreground">
-                Confiança: {Math.round(confidence * 100)}%
-              </p>
-            )}
-          </div>
-          <Button
-            className="h-14 w-full text-base font-semibold"
-            disabled={plate.length < 6 || findMutation.isPending}
-            onClick={() => findMutation.mutate(plate)}
-          >
-            {findMutation.isPending ? <Loader2 className="size-5 animate-spin" /> : "CONFIRMAR"}
-          </Button>
-          <Button variant="ghost" className="w-full" onClick={() => setStep("capture")}>
-            Tirar outra foto
-          </Button>
-        </div>
-      )}
+                  <div className="flex items-center gap-3 text-[10px] uppercase tracking-widest text-muted-foreground">
+                    <span className="h-px flex-1 bg-border" /> ou{" "}
+                    <span className="h-px flex-1 bg-border" />
+                  </div>
 
-      {step === "vehicle" && summary?.vehicle && (
-        <div className="space-y-5">
-          <div className="rounded-3xl border border-border/60 bg-card p-5 shadow-card">
-            <p className="plate text-2xl">{summary.vehicle.placa}</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {[summary.vehicle.marca, summary.vehicle.modelo, summary.vehicle.cor]
-                .filter(Boolean)
-                .join(" · ") || "Sem dados do veículo"}
-            </p>
-            <div className="mt-4 border-t border-border/60 pt-4 text-sm">
-              <p className="font-semibold">{summary.vehicle.customers?.nome ?? "Sem cliente"}</p>
-              <p className="text-muted-foreground">{summary.vehicle.customers?.telefone ?? "—"}</p>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <p className="text-muted-foreground text-xs">Atendimentos</p>
-                <p className="font-semibold">{summary.stats?.total ?? 0}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Último</p>
-                <p className="font-semibold">{dateBR(summary.stats?.last ?? null)}</p>
-              </div>
-            </div>
-          </div>
-          <Button
-            className="h-14 w-full text-base font-semibold"
-            onClick={() => setStep("services")}
-          >
-            INICIAR ATENDIMENTO
-          </Button>
-        </div>
-      )}
-
-      {step === "quick" && (
-        <form
-          className="space-y-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const phone = cliente.telefone.replace(/\D/g, "");
-            if (cliente.nome.trim().length < 2) {
-              toast.error("Informe o nome do cliente.");
-              return;
-            }
-            if (phone.length < 10 || phone.length > 11) {
-              toast.error("Informe um telefone válido com DDD.");
-              return;
-            }
-            setStep("services");
-          }}
-        >
-          <div className="rounded-2xl border border-warning/40 bg-card p-4 text-sm">
-            Veículo ainda não cadastrado.
-            <p className="plate mt-2 text-xl">{plate}</p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="cnome">Nome do cliente</Label>
-            <Input
-              id="cnome"
-              value={cliente.nome}
-              onChange={(e) => setCliente({ ...cliente, nome: e.target.value })}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="ctel">Telefone</Label>
-            <Input
-              id="ctel"
-              inputMode="tel"
-              value={cliente.telefone}
-              onChange={(e) => setCliente({ ...cliente, telefone: e.target.value })}
-              required
-              minLength={10}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="marca">Marca</Label>
-              <Input
-                id="marca"
-                value={veic.marca}
-                onChange={(e) => setVeic({ ...veic, marca: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="modelo">Modelo</Label>
-              <Input
-                id="modelo"
-                value={veic.modelo}
-                onChange={(e) => setVeic({ ...veic, modelo: e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="cor">Cor</Label>
-            <Input
-              id="cor"
-              value={veic.cor}
-              onChange={(e) => setVeic({ ...veic, cor: e.target.value })}
-            />
-          </div>
-          <Button type="submit" className="h-14 w-full text-base font-semibold">
-            CONTINUAR PARA SERVIÇOS
-          </Button>
-        </form>
-      )}
-
-      {step === "services" && (
-        <div className="space-y-4">
-          <p className="plate text-xl">{plate}</p>
-          <p className="text-xs leading-5 text-muted-foreground">
-            Escolha os serviços deste atendimento. Opções da categoria lavagem não podem ser
-            combinadas entre si.
-          </p>
-          {services.isLoading && (
-            <p className="text-sm text-muted-foreground">Carregando serviços…</p>
-          )}
-          <div className="space-y-2">
-            {active.map((s) => {
-              const on = selected.includes(s.id);
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => setSelected(toggleServiceSelection(selected, s, active))}
-                  className={`flex w-full items-center justify-between rounded-2xl border p-4 text-left transition ${
-                    on ? "border-primary bg-primary/10" : "border-border/60 bg-card"
-                  }`}
-                >
-                  <span className="min-w-0">
-                    <span className="block font-medium">{s.nome}</span>
-                    {isWashService(s) && (
-                      <span className="mt-1 block text-[11px] text-muted-foreground">
-                        Uma opção de lavagem por atendimento
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) void onFile(f);
+                      e.target.value = "";
+                    }}
+                  />
+                  {leituraPorFoto ? (
+                    <m.button
+                      type="button"
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => fileRef.current?.click()}
+                      disabled={recognizeMutation.isPending}
+                      className="flex h-20 w-full items-center justify-center gap-3 rounded-3xl border border-primary/40 bg-primary/10 text-sm font-bold text-primary transition-colors hover:bg-primary/15 disabled:opacity-60"
+                    >
+                      {recognizeMutation.isPending ? (
+                        <>
+                          <Loader2 className="size-6 animate-spin" /> LENDO A PLACA…
+                        </>
+                      ) : (
+                        <>
+                          <Camera className="size-6" /> FOTOGRAFAR A PLACA
+                        </>
+                      )}
+                    </m.button>
+                  ) : (
+                    <Link
+                      to="/planos"
+                      className="flex h-20 w-full flex-col items-center justify-center gap-1 rounded-3xl border border-dashed border-border text-center text-xs text-muted-foreground hover:border-primary/50 hover:text-primary"
+                    >
+                      <span className="flex items-center gap-2 font-bold">
+                        <Lock className="size-4" /> LEITURA DA PLACA PELA FOTO
                       </span>
-                    )}
-                  </span>
-                  <span className="text-sm">{brl(s.preco)}</span>
-                </button>
-              );
-            })}
-          </div>
+                      Disponível no plano Max
+                    </Link>
+                  )}
+                </div>
+              )}
 
-          <div className="rounded-2xl border border-border/60 bg-card p-4 text-sm">
-            <Row label="Subtotal" value={brl(subtotal)} />
-            <Row label="Desconto" value={brl(0)} />
-            <Row label="Acréscimo" value={brl(0)} />
-            <div className="mt-2 border-t border-border/60 pt-2">
-              <Row label="Total" value={brl(subtotal)} strong />
-            </div>
-          </div>
+              {step === "vehicle" && summary?.vehicle && (
+                <div className="space-y-5">
+                  <StepTitle
+                    title="Cliente encontrado"
+                    text="Confira os dados e escolha os serviços."
+                  />
+                  <div className="rounded-3xl border border-border/60 bg-card p-5 shadow-card">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <PlateBadge plate={summary.vehicle.placa} />
+                      <span className="rounded-full border border-success/40 bg-success/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-success">
+                        Cliente cadastrado
+                      </span>
+                    </div>
+                    <p className="mt-4 text-sm text-muted-foreground">
+                      {[summary.vehicle.marca, summary.vehicle.modelo, summary.vehicle.cor]
+                        .filter(Boolean)
+                        .join(" · ") || "Sem dados do veículo"}
+                    </p>
+                    <div className="mt-4 flex items-center gap-3 border-t border-border/60 pt-4">
+                      <span className="flex size-10 items-center justify-center rounded-full bg-primary/15 text-sm font-bold text-primary">
+                        {(summary.vehicle.customers?.nome ?? "?").slice(0, 1).toUpperCase()}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold">
+                          {summary.vehicle.customers?.nome ?? "Sem cliente"}
+                        </p>
+                        <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Phone className="size-3" />
+                          {summary.vehicle.customers?.telefone ?? "—"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                      <MiniStat label="Visitas" value={String(summary.stats?.total ?? 0)} />
+                      <MiniStat
+                        label="Última"
+                        value={dateBR(summary.stats?.last ?? null).slice(0, 5)}
+                      />
+                      <MiniStat label="Gasto" value={brl(summary.stats?.totalGasto ?? 0)} />
+                    </div>
+                    {summary.stats?.topServices.length ? (
+                      <p className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+                        <History className="size-3.5 shrink-0 text-primary" />
+                        Costuma fazer:{" "}
+                        {summary.stats.topServices.map((service) => service.nome).join(", ")}
+                      </p>
+                    ) : null}
+                  </div>
+                  <Button
+                    className="h-14 w-full rounded-2xl text-base font-bold shadow-glow"
+                    onClick={() => go("services")}
+                  >
+                    ESCOLHER SERVIÇOS <ArrowRight className="size-5" />
+                  </Button>
+                </div>
+              )}
 
-          <Button
-            className="h-14 w-full text-base font-semibold"
-            disabled={!selected.length || orderMutation.isPending}
-            onClick={() => orderMutation.mutate()}
-          >
-            {orderMutation.isPending ? (
-              <Loader2 className="size-5 animate-spin" />
-            ) : vehicleId ? (
-              "CRIAR ORDEM DE SERVIÇO"
-            ) : (
-              "CADASTRAR CLIENTE E CRIAR ORDEM"
-            )}
-          </Button>
+              {step === "quick" && (
+                <form
+                  className="space-y-5"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const phone = cliente.telefone.replace(/\D/g, "");
+                    if (cliente.nome.trim().length < 2) {
+                      toast.error("Informe o nome do cliente.");
+                      return;
+                    }
+                    if (phone.length < 10 || phone.length > 11) {
+                      toast.error("Informe um telefone válido com DDD.");
+                      return;
+                    }
+                    go("services");
+                  }}
+                >
+                  <StepTitle
+                    title="Primeira visita"
+                    text="Esta placa ainda não tem cadastro. Leva menos de um minuto."
+                  />
+                  <div className="flex items-center justify-between gap-4 rounded-3xl border border-warning/40 bg-warning/5 p-4">
+                    <PlateBadge plate={plate} />
+                    <UserPlus className="size-6 text-warning" />
+                  </div>
+                  <Field id="cnome" label="Nome do cliente">
+                    <Input
+                      id="cnome"
+                      value={cliente.nome}
+                      onChange={(e) => setCliente({ ...cliente, nome: e.target.value })}
+                      autoComplete="name"
+                      autoFocus
+                      required
+                    />
+                  </Field>
+                  <Field
+                    id="ctel"
+                    label="Telefone com DDD"
+                    hint="Usado para o cliente acompanhar o serviço."
+                  >
+                    <Input
+                      id="ctel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      placeholder="(85) 99999-1234"
+                      value={cliente.telefone}
+                      onChange={(e) => setCliente({ ...cliente, telefone: e.target.value })}
+                      required
+                      minLength={10}
+                    />
+                  </Field>
+                  <details className="group rounded-2xl border border-border bg-card/60 p-4">
+                    <summary className="cursor-pointer list-none text-sm font-semibold text-muted-foreground">
+                      <span className="text-primary transition-transform group-open:rotate-45 inline-block mr-2">
+                        +
+                      </span>
+                      Dados do veículo (opcional)
+                    </summary>
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      <Field id="marca" label="Marca">
+                        <Input
+                          id="marca"
+                          value={veic.marca}
+                          onChange={(e) => setVeic({ ...veic, marca: e.target.value })}
+                        />
+                      </Field>
+                      <Field id="modelo" label="Modelo">
+                        <Input
+                          id="modelo"
+                          value={veic.modelo}
+                          onChange={(e) => setVeic({ ...veic, modelo: e.target.value })}
+                        />
+                      </Field>
+                      <div className="col-span-2">
+                        <Field id="cor" label="Cor">
+                          <Input
+                            id="cor"
+                            value={veic.cor}
+                            onChange={(e) => setVeic({ ...veic, cor: e.target.value })}
+                          />
+                        </Field>
+                      </div>
+                    </div>
+                  </details>
+                  <Button
+                    type="submit"
+                    className="h-14 w-full rounded-2xl text-base font-bold shadow-glow"
+                  >
+                    ESCOLHER SERVIÇOS <ArrowRight className="size-5" />
+                  </Button>
+                </form>
+              )}
+
+              {step === "services" && (
+                <div className="space-y-4 pb-28">
+                  <div className="flex items-end justify-between gap-4">
+                    <StepTitle
+                      title="Quais serviços?"
+                      text="Uma opção de lavagem por atendimento; adicionais podem ser combinados."
+                    />
+                    <PlateBadge plate={plate} className="shrink-0" />
+                  </div>
+                  {services.isLoading && (
+                    <div className="space-y-2">
+                      {[0, 1, 2].map((item) => (
+                        <Skeleton key={item} className="h-[72px] rounded-2xl" />
+                      ))}
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    {active.map((s, index) => {
+                      const on = selected.includes(s.id);
+                      return (
+                        <m.button
+                          key={s.id}
+                          type="button"
+                          aria-pressed={on}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0, transition: { delay: index * 0.04 } }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => setSelected(toggleServiceSelection(selected, s, active))}
+                          className={`flex w-full items-center gap-4 rounded-2xl border p-4 text-left transition-colors ${
+                            on
+                              ? "border-primary bg-primary/10"
+                              : "border-border/60 bg-card hover:border-primary/40"
+                          }`}
+                        >
+                          <span
+                            className={`flex size-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                              on
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border"
+                            }`}
+                          >
+                            <AnimatePresence>
+                              {on && (
+                                <m.span
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: 1 }}
+                                  exit={{ scale: 0 }}
+                                  transition={{ type: "spring", stiffness: 700, damping: 20 }}
+                                >
+                                  <Check className="size-3.5" />
+                                </m.span>
+                              )}
+                            </AnimatePresence>
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block font-semibold">{s.nome}</span>
+                            <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                              {isWashService(s) ? "Lavagem" : "Adicional"}
+                              {s.duracao_min ? ` · ${s.duracao_min} min` : ""}
+                            </span>
+                          </span>
+                          <span className="text-sm font-bold tabular-nums">{brl(s.preco)}</span>
+                        </m.button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] backdrop-blur-md">
+                    <div className="mx-auto flex max-w-xl items-center gap-4">
+                      <div className="min-w-0">
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                          {selected.length} {selected.length === 1 ? "serviço" : "serviços"}
+                        </p>
+                        <p className="text-xl font-bold tabular-nums text-primary">
+                          <CountUp value={subtotal} format={brl} />
+                        </p>
+                      </div>
+                      <Button
+                        className="h-13 flex-1 rounded-2xl text-sm font-bold shadow-glow"
+                        disabled={!selected.length || orderMutation.isPending}
+                        onClick={() => orderMutation.mutate()}
+                      >
+                        {orderMutation.isPending ? (
+                          <Loader2 className="size-5 animate-spin" />
+                        ) : vehicleId ? (
+                          "CRIAR ATENDIMENTO"
+                        ) : (
+                          "CADASTRAR E CRIAR"
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </m.div>
+          </AnimatePresence>
         </div>
-      )}
+      </div>
     </AppShell>
   );
 }
 
-function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+function Progress({ stage }: { stage: number }) {
   return (
-    <div className="flex items-center justify-between py-0.5">
-      <span className={strong ? "font-semibold" : "text-muted-foreground"}>{label}</span>
-      <span className={strong ? "text-lg font-bold" : ""}>{value}</span>
+    <ol className="grid grid-cols-3 gap-2" aria-label="Etapas do novo atendimento">
+      {STAGES.map((label, index) => (
+        <li key={label} aria-current={index === stage ? "step" : undefined}>
+          <span className="block h-1.5 overflow-hidden rounded-full bg-border">
+            <m.span
+              className="block h-full origin-left rounded-full bg-primary"
+              initial={false}
+              animate={{ scaleX: index <= stage ? 1 : 0 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+            />
+          </span>
+          <span
+            className={`mt-2 block text-[10px] font-bold uppercase tracking-wider ${
+              index === stage
+                ? "text-primary"
+                : index < stage
+                  ? "text-foreground"
+                  : "text-muted-foreground"
+            }`}
+          >
+            {index + 1}. {label}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function StepTitle({ title, text }: { title: string; text: string }) {
+  return (
+    <div>
+      <h2 className="text-2xl font-bold tracking-[-0.04em]">{title}</h2>
+      <p className="mt-1 text-sm leading-6 text-muted-foreground">{text}</p>
+    </div>
+  );
+}
+
+function Field({
+  id,
+  label,
+  hint,
+  children,
+}: {
+  id: string;
+  label: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      {children}
+      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-border/60 bg-background/40 p-2.5">
+      <p className="text-[10px] text-muted-foreground">{label}</p>
+      <p className="mt-0.5 truncate text-sm font-bold">{value}</p>
     </div>
   );
 }
