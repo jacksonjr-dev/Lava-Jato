@@ -55,6 +55,8 @@ function AuthPage() {
       navigate({ to: isDemoOnboardingPending() ? "/onboarding" : "/home", replace: true });
       return;
     }
+    // No modo demonstração o Supabase não é configurado.
+    if (isDemoEnabled()) return;
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) navigate({ to: "/home", replace: true });
     });

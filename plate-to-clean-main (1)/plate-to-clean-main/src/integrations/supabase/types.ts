@@ -230,6 +230,21 @@ export type Database = {
           },
         ];
       };
+      platform_admins: {
+        Row: {
+          created_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       portal_login_attempts: {
         Row: {
           failures: number;
@@ -542,9 +557,12 @@ export type Database = {
           pix_city: string | null;
           pix_key: string | null;
           pix_receiver_name: string | null;
+          plan: string;
+          plan_expires_at: string | null;
           public_listing: boolean;
           slug: string;
           telefone: string | null;
+          trial_ends_at: string | null;
           updated_at: string;
         };
         Insert: {
@@ -559,9 +577,12 @@ export type Database = {
           pix_city?: string | null;
           pix_key?: string | null;
           pix_receiver_name?: string | null;
+          plan?: string;
+          plan_expires_at?: string | null;
           public_listing?: boolean;
           slug: string;
           telefone?: string | null;
+          trial_ends_at?: string | null;
           updated_at?: string;
         };
         Update: {
@@ -576,9 +597,12 @@ export type Database = {
           pix_city?: string | null;
           pix_key?: string | null;
           pix_receiver_name?: string | null;
+          plan?: string;
+          plan_expires_at?: string | null;
           public_listing?: boolean;
           slug?: string;
           telefone?: string | null;
+          trial_ends_at?: string | null;
           updated_at?: string;
         };
         Relationships: [];

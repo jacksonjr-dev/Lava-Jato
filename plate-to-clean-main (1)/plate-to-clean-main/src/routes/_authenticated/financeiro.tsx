@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
@@ -12,12 +12,15 @@ import {
   FileSpreadsheet,
   FileText,
   Loader2,
+  Lock,
   QrCode,
   ReceiptText,
   Save,
   WalletCards,
 } from "lucide-react";
 import { AppShell } from "@/components/app/shell";
+import { UpgradeNotice } from "@/components/app/plan-gate";
+import { useFeature } from "@/hooks/use-plan";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,8 +47,14 @@ const METHOD_LABEL: Record<string, string> = {
 };
 
 function FinancialPage() {
+  const financeiroLiberado = useFeature("financeiro");
+  const exportacaoLiberada = useFeature("exportacao");
   const loadSummary = useServerFn(financialSummary);
-  const query = useQuery({ queryKey: ["financial-summary"], queryFn: () => loadSummary() });
+  const query = useQuery({
+    queryKey: ["financial-summary"],
+    queryFn: () => loadSummary(),
+    enabled: financeiroLiberado,
+  });
   const data = query.data;
   const [exporting, setExporting] = useState<"excel" | "pdf" | null>(null);
 
@@ -63,6 +72,14 @@ function FinancialPage() {
     }
   }
 
+  if (!financeiroLiberado) {
+    return (
+      <AppShell title="Financeiro" wide>
+        <UpgradeNotice feature="financeiro" />
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell title="Financeiro" wide>
       <div className="pb-4">
@@ -77,7 +94,16 @@ function FinancialPage() {
             <p className="text-xs leading-5 text-muted-foreground">
               Valores calculados a partir dos pagamentos registrados e das ordens de serviço do mês.
             </p>
-            {data && (
+            {data && !exportacaoLiberada && (
+              <Link
+                to="/planos"
+                className="mt-4 flex h-10 items-center justify-center gap-2 border border-border text-xs text-muted-foreground hover:border-primary/50 hover:text-primary"
+              >
+                <Lock className="size-4" />
+                Exportar PDF e Excel no plano Max
+              </Link>
+            )}
+            {data && exportacaoLiberada && (
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <Button
                   type="button"
@@ -242,11 +268,21 @@ function FinancialPage() {
               </div>
             </section>
 
-            <PixSettingsCard />
+            <PixSettingsSection />
           </>
         )}
       </div>
     </AppShell>
+  );
+}
+
+function PixSettingsSection() {
+  const pixLiberado = useFeature("pix");
+  if (pixLiberado) return <PixSettingsCard />;
+  return (
+    <div className="mt-6">
+      <UpgradeNotice feature="pix" compact />
+    </div>
   );
 }
 

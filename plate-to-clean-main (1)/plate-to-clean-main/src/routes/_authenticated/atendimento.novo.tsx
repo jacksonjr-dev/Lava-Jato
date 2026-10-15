@@ -1,10 +1,11 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { Camera, Keyboard, Loader2 } from "lucide-react";
+import { Camera, Keyboard, Loader2, Lock } from "lucide-react";
 import { AppShell } from "@/components/app/shell";
+import { useFeature } from "@/hooks/use-plan";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,6 +36,7 @@ type Step = "capture" | "confirm" | "vehicle" | "quick" | "services";
 function NovoAtendimento() {
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
+  const leituraPorFoto = useFeature("placa_foto");
 
   const recognizeFn = useServerFn(recognizePlate);
   const findFn = useServerFn(findVehicleByPlate);
@@ -144,19 +146,31 @@ function NovoAtendimento() {
               if (f) void onFile(f);
             }}
           />
-          <Button
-            className="h-28 w-full rounded-3xl bg-brand text-lg font-bold text-primary-foreground shadow-glow"
-            onClick={() => fileRef.current?.click()}
-            disabled={recognizeMutation.isPending}
-          >
-            {recognizeMutation.isPending ? (
-              <Loader2 className="size-7 animate-spin" />
-            ) : (
-              <>
-                <Camera className="mr-2 size-7" /> FOTOGRAFAR PLACA
-              </>
-            )}
-          </Button>
+          {leituraPorFoto ? (
+            <Button
+              className="h-28 w-full rounded-3xl bg-brand text-lg font-bold text-primary-foreground shadow-glow"
+              onClick={() => fileRef.current?.click()}
+              disabled={recognizeMutation.isPending}
+            >
+              {recognizeMutation.isPending ? (
+                <Loader2 className="size-7 animate-spin" />
+              ) : (
+                <>
+                  <Camera className="mr-2 size-7" /> FOTOGRAFAR PLACA
+                </>
+              )}
+            </Button>
+          ) : (
+            <Link
+              to="/planos"
+              className="flex h-28 w-full flex-col items-center justify-center gap-2 rounded-3xl border border-border bg-card text-center text-sm text-muted-foreground hover:border-primary/50 hover:text-primary"
+            >
+              <span className="flex items-center gap-2 font-bold">
+                <Lock className="size-5" /> LEITURA DA PLACA PELA FOTO
+              </span>
+              <span className="text-xs">Disponível no plano Max · ver planos</span>
+            </Link>
+          )}
           <Button
             variant="secondary"
             className="h-13 w-full text-base"

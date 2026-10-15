@@ -6,6 +6,7 @@ import { assertOrderTransition } from "./order-flow";
 import { calculateFinancialStats, financialPeriod } from "./financial";
 import { assertCompatibleServices } from "./service-selection";
 import type { BusinessHours } from "./business-hours";
+import { FREE_MONTHLY_ORDER_LIMIT, TRIAL_DAYS, resolveSubscription, type PlanId } from "./plans";
 
 type OrderStatus = Database["public"]["Enums"]["order_status"];
 type PaymentMethod = Database["public"]["Enums"]["payment_method"];
@@ -175,6 +176,40 @@ function persistDemoPixSettings(settings: DemoPixSettings): void {
 
 let pixSettings = loadDemoPixSettings();
 let businessSettings = loadDemoBusinessSettings();
+
+type DemoSubscription = {
+  plan: PlanId;
+  trial_ends_at: string | null;
+  plan_expires_at: string | null;
+};
+const demoSubscriptionPath = resolve(process.cwd(), ".data", "demo-subscription.json");
+
+function loadDemoSubscription(): DemoSubscription {
+  try {
+    const saved = JSON.parse(readFileSync(demoSubscriptionPath, "utf8")) as DemoSubscription;
+    if (saved.plan) return saved;
+  } catch {
+    // Sem arquivo: a empresa de demonstração começa no período de teste.
+  }
+  return {
+    plan: "GRATIS",
+    trial_ends_at: new Date(Date.now() + TRIAL_DAYS * 86_400_000).toISOString(),
+    plan_expires_at: null,
+  };
+}
+
+let demoSubscription = loadDemoSubscription();
+
+export function demoSubscriptionFields(): DemoSubscription {
+  return { ...demoSubscription };
+}
+
+export function demoUpdateSubscription(fields: DemoSubscription): DemoSubscription {
+  demoSubscription = { ...fields };
+  mkdirSync(dirname(demoSubscriptionPath), { recursive: true });
+  writeFileSync(demoSubscriptionPath, JSON.stringify(demoSubscription, null, 2), "utf8");
+  return demoSubscriptionFields();
+}
 const daysAgo = (days: number, hour: number) => {
   const date = new Date();
   date.setDate(date.getDate() - days);
@@ -502,6 +537,7 @@ export function demoSession() {
     membership: { tenantId, role: "OWNER" as const },
     tenant: {
       ...businessSettings,
+      ...demoSubscription,
       public_listing: true,
       ...pixSettings,
       created_at: now(),
@@ -696,6 +732,7 @@ function demoPortalForVehicle(vehicle: DemoVehicle) {
     tenant: {
       ...businessSettings,
       ...pixSettings,
+      ...demoSubscription,
     },
     customer: vehicle.customers,
     vehicle,
@@ -836,7 +873,32 @@ export function demoCreateIntake(data: {
   }
 }
 
+export function demoOrdersThisMonth(): number {
+  const monthStart = financialPeriod(new Date()).startMonth.getTime();
+  return [...orders.values()].filter((order) => Date.parse(order.created_at) >= monthStart).length;
+}
+
+export function demoAdminTenants() {
+  return [
+    {
+      id: tenantId,
+      nome: businessSettings.nome,
+      slug: businessSettings.slug,
+      telefone: businessSettings.telefone,
+      created_at: daysAgo(30, 9),
+      owner_email: "demo@lavapro.local",
+      ...demoSubscription,
+    },
+  ];
+}
+
 export function demoCreateOrder(data: { vehicle_id: string; service_ids: string[] }) {
+  const limit = resolveSubscription(demoSubscription).monthlyOrderLimit;
+  if (limit !== null && demoOrdersThisMonth() >= limit) {
+    throw new Error(
+      `O plano Grátis permite ${FREE_MONTHLY_ORDER_LIMIT} atendimentos por mês. Assine um plano para continuar.`,
+    );
+  }
   const vehicle = [...vehicles.values()].find((item) => item.id === data.vehicle_id);
   if (!vehicle) throw new Error("Veículo não encontrado.");
   const ids = [...new Set(data.service_ids ?? [])];

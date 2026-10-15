@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { WashBrand } from "@/components/app/wash-brand";
 import { WashHoseBackdrop } from "@/components/app/wash-hose-backdrop";
+import { PLAN_IDS, PLANS, TRIAL_DAYS } from "@/lib/plans";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -47,43 +48,6 @@ const NAV_LINKS = [
   { href: "#cliente", label: "Para o cliente" },
   { href: "#planos", label: "Planos" },
   { href: "#duvidas", label: "Dúvidas" },
-];
-
-/**
- * Planos exibidos na página. Defina `preco` (ex.: "R$ 99") quando os valores
- * estiverem decididos; enquanto for null, o card mostra "Sob consulta".
- */
-const PLANS: Array<{
-  nome: string;
-  publico: string;
-  preco: string | null;
-  destaque?: boolean;
-  itens: string[];
-}> = [
-  {
-    nome: "Essencial",
-    publico: "Para quem está começando a organizar o pátio.",
-    preco: null,
-    itens: [
-      "Atendimento pela placa",
-      "Ordens de serviço com status",
-      "Catálogo de serviços",
-      "Área do cliente com placa e telefone",
-    ],
-  },
-  {
-    nome: "Profissional",
-    publico: "Para lava-jatos com movimento diário e equipe.",
-    preco: null,
-    destaque: true,
-    itens: [
-      "Tudo do Essencial",
-      "Leitura da placa pela foto",
-      "Cobrança PIX com QR Code",
-      "Financeiro com exportação em PDF e Excel",
-      "Equipe com permissões por função",
-    ],
-  },
 ];
 
 function Landing() {
@@ -632,10 +596,10 @@ function Plans() {
       <SectionTitle
         eyebrow="PLANOS"
         title="Escolha o plano do tamanho do seu pátio."
-        description="Mensalidade fixa, sem fidelidade. Cancele quando quiser."
+        description={`Comece com ${TRIAL_DAYS} dias grátis do plano Max. Depois, escolha o seu plano ou continue no Grátis, sem perder seus dados.`}
       />
-      <div className="reveal-stagger mt-8 grid gap-6 md:grid-cols-2">
-        {PLANS.map((plan) => (
+      <div className="reveal-stagger mt-8 grid gap-6 lg:grid-cols-3">
+        {PLAN_IDS.map((id) => PLANS[id]).map((plan) => (
           <article
             key={plan.nome}
             className={`relative flex flex-col border bg-card p-6 md:p-8 ${
@@ -648,10 +612,10 @@ function Plans() {
               </span>
             )}
             <h3 className="text-2xl font-bold tracking-[-0.04em]">{plan.nome}</h3>
-            <p className="mt-2 text-sm text-muted-foreground">{plan.publico}</p>
+            <p className="mt-2 text-sm text-muted-foreground">{plan.descricao}</p>
             <p className="mt-6 text-3xl font-bold text-primary">
               {plan.preco ?? "Sob consulta"}
-              {plan.preco && (
+              {plan.preco && plan.id !== "GRATIS" && (
                 <span className="text-sm font-normal text-muted-foreground">/mês</span>
               )}
             </p>
@@ -787,9 +751,20 @@ function SiteFooter() {
           ]}
         />
       </div>
-      <p className="border-t border-border/60 px-5 py-5 text-center text-[10px] text-muted-foreground">
-        © {new Date().getFullYear()} LavaPro. Todos os direitos reservados.
-      </p>
+      <div className="flex flex-col items-center justify-between gap-2 border-t border-border/60 px-5 py-5 text-center text-[10px] text-muted-foreground sm:flex-row sm:px-8">
+        <p>© {new Date().getFullYear()} LavaPro. Todos os direitos reservados.</p>
+        <p>
+          Desenvolvido por{" "}
+          <a
+            href="https://jpglabs.netlify.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-bold text-primary underline-offset-2 hover:underline"
+          >
+            JPGLabs
+          </a>
+        </p>
+      </div>
     </footer>
   );
 }

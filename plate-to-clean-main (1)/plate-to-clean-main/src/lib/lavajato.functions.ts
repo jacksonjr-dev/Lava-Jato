@@ -5,7 +5,9 @@ import {
   dashboardStats,
   getMembership,
   loadOrder,
+  ordersThisMonth,
   recognizePlateFromImage,
+  requireFeature,
   requireManager,
   requireMembership,
   vehicleSummary,
@@ -14,6 +16,7 @@ import { normalizePlate } from "./plate";
 import type { Database, Json } from "@/integrations/supabase/types";
 import {
   demoActiveOrders,
+  demoAdminTenants,
   demoClientPortal,
   demoClientPortalByVehicleId,
   demoCreateBusiness,
@@ -24,12 +27,15 @@ import {
   demoGetPixSettings,
   demoGetOrder,
   demoListVehicles,
+  demoOrdersThisMonth,
   demoHomeSummary,
   demoQuickRegister,
   demoRegisterPayment,
   demoServices,
   demoSearchPublicTenants,
   demoSession,
+  demoSubscriptionFields,
+  demoUpdateSubscription,
   demoUpdateOrderStatus,
   demoUpdateBusinessProfile,
   demoUpdateService,
@@ -43,6 +49,17 @@ import { assertCompatibleServices } from "./service-selection";
 import { assertOrderTransition } from "./order-flow";
 import { validateBusinessHours, type BusinessHours } from "./business-hours";
 import { matchesBusinessIdentity } from "./business-identity";
+import {
+  applyAdminSubscriptionAction,
+  assertFeature,
+  hasFeature,
+  resolveSubscription,
+  type AdminSubscriptionAction,
+  type Feature,
+  type SubscriptionFields,
+} from "./plans";
+
+export type { AdminSubscriptionAction } from "./plans";
 
 type OrderStatus = Database["public"]["Enums"]["order_status"];
 type PaymentMethod = Database["public"]["Enums"]["payment_method"];
@@ -51,6 +68,19 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 
 function phoneDigits(value: string | null | undefined): string {
   return (value ?? "").replace(/\D/g, "");
+}
+
+function assertDemoFeature(feature: Feature): void {
+  assertFeature(resolveSubscription(demoSubscriptionFields()), feature);
+}
+
+/** O portal só atende lava-jatos cujo plano inclui a área do cliente. */
+function portalSubscription(tenant: SubscriptionFields | null) {
+  const subscription = resolveSubscription(tenant);
+  if (!hasFeature(subscription, "area_cliente")) {
+    throw new Error("Este lava-jato não oferece a área do cliente no momento.");
+  }
+  return subscription;
 }
 
 async function buildPortalPix(
@@ -100,7 +130,15 @@ export const searchPublicTenants = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const query = data.query.trim().slice(0, 60);
     if (query.length < 2) return [];
-    if (isDemoServerMode()) return demoSearchPublicTenants(query);
+    if (isDemoServerMode()) {
+      const demoPortalEnabled = hasFeature(
+        resolveSubscription(demoSubscriptionFields()),
+        "area_cliente",
+      );
+      return demoSearchPublicTenants(query).filter(
+        (tenant) => demoPortalEnabled || tenant.id !== "demo-tenant",
+      );
+    }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const safeQuery = query
@@ -110,13 +148,16 @@ export const searchPublicTenants = createServerFn({ method: "GET" })
     if (safeQuery.length < 2) return [];
     const { data: tenants, error } = await supabaseAdmin
       .from("tenants")
-      .select("id, slug, nome, endereco, logo_url")
+      .select("id, slug, nome, endereco, logo_url, plan, trial_ends_at, plan_expires_at")
       .eq("public_listing", true)
       .or(`nome.ilike.%${safeQuery}%,slug.ilike.%${safeQuery.toLowerCase()}%`)
       .order("nome", { ascending: true })
-      .limit(12);
+      .limit(40);
     if (error) throw new Error("Não foi possível buscar os lava-jatos.");
-    return tenants ?? [];
+    return (tenants ?? [])
+      .filter((tenant) => hasFeature(resolveSubscription(tenant), "area_cliente"))
+      .slice(0, 12)
+      .map(({ id, slug, nome, endereco, logo_url }) => ({ id, slug, nome, endereco, logo_url }));
   });
 
 export const clientPortalLogin = createServerFn({ method: "POST" })
@@ -143,6 +184,7 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
       const claims = security.verifyClientPortalToken(accessToken);
       if (isDemoServerMode()) {
         const portal = demoClientPortalByVehicleId(claims.vehicleId, claims.tenantId);
+        const subscription = portalSubscription(portal.tenant);
         return {
           ...portal,
           tenant: {
@@ -154,7 +196,9 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
             horario: portal.tenant.horario,
             business_hours: portal.tenant.business_hours,
           },
-          pix: await buildPortalPix(portal.tenant, portal.orders),
+          pix: hasFeature(subscription, "pix")
+            ? await buildPortalPix(portal.tenant, portal.orders)
+            : null,
           accessToken,
         };
       }
@@ -184,6 +228,7 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
       }
 
       if (isDemoServerMode()) {
+        const subscription = portalSubscription(demoSubscriptionFields());
         try {
           const portal = demoClientPortal(tenantId, placa, telefone);
           await security.clearPortalAttemptFailures(attemptRules);
@@ -202,7 +247,9 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
               horario: portal.tenant.horario,
               business_hours: portal.tenant.business_hours,
             },
-            pix: await buildPortalPix(portal.tenant, portal.orders),
+            pix: hasFeature(subscription, "pix")
+              ? await buildPortalPix(portal.tenant, portal.orders)
+              : null,
             accessToken,
           };
         } catch {
@@ -255,7 +302,7 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
         supabaseAdmin
           .from("tenants")
           .select(
-            "id, slug, nome, telefone, endereco, horario, business_hours, pix_key, pix_receiver_name, pix_city",
+            "id, slug, nome, telefone, endereco, horario, business_hours, pix_key, pix_receiver_name, pix_city, plan, trial_ends_at, plan_expires_at",
           )
           .eq("id", vehicle.tenant_id)
           .single(),
@@ -273,8 +320,9 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
       throw new Error("Não foi possível consultar seus atendimentos.");
     }
 
+    const subscription = portalSubscription(tenant);
     const history = orders ?? [];
-    const pix = await buildPortalPix(tenant, history);
+    const pix = hasFeature(subscription, "pix") ? await buildPortalPix(tenant, history) : null;
     return {
       tenant: tenant
         ? {
@@ -315,14 +363,21 @@ export const getSession = createServerFn({ method: "GET" })
     if (isDemoServerMode()) {
       return {
         ...demoSession(),
+        subscription: resolveSubscription(demoSubscriptionFields()),
+        usage: { ordersThisMonth: demoOrdersThisMonth() },
+        isPlatformAdmin: true,
         user: { id: "demo-user", email: "demo@lavapro.local" },
       };
     }
+    const isPlatformAdmin = await checkPlatformAdmin(context.userId);
     const membership = await getMembership(context.supabase, context.userId);
     if (!membership) {
       return {
         membership: null,
         tenant: null,
+        subscription: null,
+        usage: null,
+        isPlatformAdmin,
         user: {
           id: context.userId,
           email: typeof context.claims.email === "string" ? context.claims.email : null,
@@ -335,9 +390,18 @@ export const getSession = createServerFn({ method: "GET" })
       .eq("id", membership.tenantId)
       .maybeSingle();
     if (error) throw new Error(error.message);
+    const subscription = resolveSubscription(tenant);
     return {
       membership,
       tenant,
+      subscription,
+      usage: {
+        ordersThisMonth:
+          subscription.monthlyOrderLimit === null
+            ? null
+            : await ordersThisMonth(context.supabase, membership.tenantId),
+      },
+      isPlatformAdmin,
       user: {
         id: context.userId,
         email: typeof context.claims.email === "string" ? context.claims.email : null,
@@ -613,8 +677,12 @@ export const recognizePlate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: { image: string }) => data)
   .handler(async ({ data, context }) => {
-    if (isDemoServerMode()) return { plate: "ABC1D23", confidence: 0.98 };
-    await requireMembership(context.supabase, context.userId);
+    if (isDemoServerMode()) {
+      assertDemoFeature("placa_foto");
+      return { plate: "ABC1D23", confidence: 0.98 };
+    }
+    const { tenantId } = await requireMembership(context.supabase, context.userId);
+    await requireFeature(context.supabase, tenantId, "placa_foto");
     if (!data.image?.startsWith("data:image/")) throw new Error("Imagem inválida.");
     // ~6 MB de imagem em base64; evita enviar arquivos enormes (e caros) à API de visão.
     if (data.image.length > 8_000_000) throw new Error("Imagem muito grande. Tire outra foto.");
@@ -944,16 +1012,24 @@ export const homeSummary = createServerFn({ method: "GET" })
 export const financialSummary = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    if (isDemoServerMode()) return demoFinancialSummary();
+    if (isDemoServerMode()) {
+      assertDemoFeature("financeiro");
+      return demoFinancialSummary();
+    }
     const { tenantId } = await requireManager(context.supabase, context.userId);
+    await requireFeature(context.supabase, tenantId, "financeiro");
     return dashboardStats(context.supabase, tenantId);
   });
 
 export const getPixSettings = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    if (isDemoServerMode()) return demoGetPixSettings();
+    if (isDemoServerMode()) {
+      assertDemoFeature("pix");
+      return demoGetPixSettings();
+    }
     const { tenantId } = await requireManager(context.supabase, context.userId);
+    await requireFeature(context.supabase, tenantId, "pix");
     const { data, error } = await context.supabase
       .from("tenants")
       .select("pix_key, pix_receiver_name, pix_city")
@@ -991,8 +1067,12 @@ export const updatePixSettings = createServerFn({ method: "POST" })
       transactionId: "VALIDACAO",
     });
 
-    if (isDemoServerMode()) return demoUpdatePixSettings(settings);
+    if (isDemoServerMode()) {
+      assertDemoFeature("pix");
+      return demoUpdatePixSettings(settings);
+    }
     const { tenantId } = await requireManager(context.supabase, context.userId);
+    await requireFeature(context.supabase, tenantId, "pix");
     const { data: saved, error } = await context.supabase
       .from("tenants")
       .update(settings)
@@ -1029,4 +1109,86 @@ export const listActiveOrders = createServerFn({ method: "GET" })
       .limit(30);
     if (error) throw new Error(error.message);
     return data ?? [];
+  });
+
+async function checkPlatformAdmin(userId: string): Promise<boolean> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("platform_admins")
+      .select("user_id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    return !error && Boolean(data);
+  } catch {
+    return false;
+  }
+}
+
+async function requirePlatformAdmin(userId: string): Promise<void> {
+  if (!(await checkPlatformAdmin(userId))) {
+    throw new Error("Acesso restrito à administração do LavaPro.");
+  }
+}
+
+export const adminListTenants = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    if (isDemoServerMode()) {
+      return demoAdminTenants().map((tenant) => ({
+        ...tenant,
+        subscription: resolveSubscription(tenant),
+      }));
+    }
+    await requirePlatformAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [{ data: tenants, error }, { data: owners, error: ownersError }, usersResult] =
+      await Promise.all([
+        supabaseAdmin
+          .from("tenants")
+          .select("id, nome, slug, telefone, created_at, plan, trial_ends_at, plan_expires_at")
+          .order("created_at", { ascending: false })
+          .limit(500),
+        supabaseAdmin.from("tenant_members").select("tenant_id, user_id").eq("role", "OWNER"),
+        supabaseAdmin.auth.admin.listUsers({ perPage: 1000 }),
+      ]);
+    if (error || ownersError) throw new Error("Não foi possível listar as empresas.");
+    const emailByUser = new Map(
+      (usersResult.data?.users ?? []).map((user) => [user.id, user.email ?? null]),
+    );
+    const ownerByTenant = new Map(
+      (owners ?? []).map((owner) => [owner.tenant_id, emailByUser.get(owner.user_id) ?? null]),
+    );
+    return (tenants ?? []).map((tenant) => ({
+      ...tenant,
+      owner_email: ownerByTenant.get(tenant.id) ?? null,
+      subscription: resolveSubscription(tenant),
+    }));
+  });
+
+export const adminUpdateSubscription = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { tenantId: string; change: AdminSubscriptionAction }) => data)
+  .handler(async ({ data, context }) => {
+    if (isDemoServerMode()) {
+      return demoUpdateSubscription(
+        applyAdminSubscriptionAction(demoSubscriptionFields(), data.change),
+      );
+    }
+    await requirePlatformAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: current, error } = await supabaseAdmin
+      .from("tenants")
+      .select("plan, trial_ends_at, plan_expires_at")
+      .eq("id", data.tenantId)
+      .single();
+    if (error || !current) throw new Error("Empresa não encontrada.");
+    const { data: updated, error: updateError } = await supabaseAdmin
+      .from("tenants")
+      .update(applyAdminSubscriptionAction(current, data.change))
+      .eq("id", data.tenantId)
+      .select("plan, trial_ends_at, plan_expires_at")
+      .single();
+    if (updateError) throw new Error("Não foi possível atualizar o plano.");
+    return updated;
   });

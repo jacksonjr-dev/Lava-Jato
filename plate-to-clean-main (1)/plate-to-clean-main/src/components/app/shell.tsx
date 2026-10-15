@@ -1,7 +1,18 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Building2, Car, House, LogOut, Menu, WalletCards, Wrench } from "lucide-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import {
+  ArrowLeft,
+  Building2,
+  Car,
+  Crown,
+  House,
+  Lock,
+  LogOut,
+  Menu,
+  ShieldCheck,
+  WalletCards,
+  Wrench,
+} from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,15 +24,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { ReactNode } from "react";
-import {
-  endDemoSession,
-  getDemoBusiness,
-  hasDemoSession,
-  isDemoOnboardingPending,
-} from "@/lib/demo-auth";
+import { endDemoSession, getDemoBusiness, hasDemoSession } from "@/lib/demo-auth";
 import { WashMark } from "@/components/app/wash-brand";
 import { WashHoseBackdrop } from "@/components/app/wash-hose-backdrop";
-import { getSession } from "@/lib/lavajato.functions";
+import { SubscriptionBanner } from "@/components/app/plan-gate";
+import { useFeature, useSessionQuery } from "@/hooks/use-plan";
 
 export function AppShell({
   title,
@@ -38,14 +45,8 @@ export function AppShell({
 }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const session = useServerFn(getSession);
-  const demoOnboardingPending = isDemoOnboardingPending();
-  const sessionQuery = useQuery({
-    queryKey: ["session"],
-    queryFn: () => session(),
-    staleTime: 60_000,
-    enabled: !demoOnboardingPending,
-  });
+  const sessionQuery = useSessionQuery();
+  const financeiroLiberado = useFeature("financeiro");
   const demoBusiness = getDemoBusiness();
   const businessName = demoBusiness?.nome ?? sessionQuery.data?.tenant?.nome;
 
@@ -117,6 +118,26 @@ export function AppShell({
                     Catálogo de serviços
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  asChild
+                  className="rounded-xl px-3 py-3 focus:bg-primary/10 focus:text-primary"
+                >
+                  <Link to="/planos">
+                    <Crown />
+                    Planos e assinatura
+                  </Link>
+                </DropdownMenuItem>
+                {sessionQuery.data?.isPlatformAdmin ? (
+                  <DropdownMenuItem
+                    asChild
+                    className="rounded-xl px-3 py-3 focus:bg-primary/10 focus:text-primary"
+                  >
+                    <Link to="/admin">
+                      <ShieldCheck />
+                      Administração LavaPro
+                    </Link>
+                  </DropdownMenuItem>
+                ) : null}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="rounded-xl px-3 py-3 text-destructive focus:bg-destructive/10 focus:text-destructive"
@@ -135,6 +156,7 @@ export function AppShell({
           Ambiente de teste · dados operacionais simulados
         </div>
       ) : null}
+      <SubscriptionBanner />
       <main
         className={`page-enter mx-auto w-full px-4 py-6 safe-bottom md:px-6 ${wide ? "max-w-6xl" : "max-w-5xl"}`}
       >
@@ -147,7 +169,13 @@ export function AppShell({
             <NavItem to="/servicos" icon={<Wrench className="size-4" />} label="Serviços" />
             <NavItem
               to="/financeiro"
-              icon={<WalletCards className="size-4" />}
+              icon={
+                financeiroLiberado ? (
+                  <WalletCards className="size-4" />
+                ) : (
+                  <Lock className="size-4" />
+                )
+              }
               label="Financeiro"
             />
             <NavItem to="/veiculos" icon={<Car className="size-4" />} label="Veículos" />
