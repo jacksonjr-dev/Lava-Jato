@@ -32,4 +32,22 @@ describe("OCR de placa", () => {
     expect(agreement({ votes: 1, confidence: 0.8 }, 4)).toBe(0.8);
     expect(agreement({ votes: 4, confidence: 1 }, 4)).toBe(0.99);
   });
+
+  it("leituras deslocadas da mesma placa não vencem a leitura principal", () => {
+    // Cada leitura gera a placa e cópias "deslocadas"; só a 1ª deve pesar de verdade.
+    const [winner] = tallyVotes([
+      { candidates: ["LSN4T49", "SNA7A94"], confidence: 0, weight: 1 },
+      { candidates: ["ISN4T49", "SNA7A94"], confidence: 0, weight: 1 },
+      { candidates: ["LSN4T49", "SNA7A94"], confidence: 0, weight: 1 },
+    ]);
+    expect(winner?.plate).toBe("LSN4T49");
+  });
+
+  it("o recorte da placa pesa mais que a foto inteira", () => {
+    const [winner] = tallyVotes([
+      { candidates: ["PLQ8F28"], confidence: 0.47, weight: 1 },
+      { candidates: ["PLO8F28"], confidence: 0.6 },
+    ]);
+    expect(winner?.plate).toBe("PLQ8F28");
+  });
 });

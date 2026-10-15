@@ -41,6 +41,15 @@ function getWorker(): Promise<Worker> {
   return workerPromise;
 }
 
+/** Diagnóstico: localStorage.setItem("lavapro:ocr-debug", "1") mostra cada leitura no console. */
+function debugEnabled(): boolean {
+  try {
+    return localStorage.getItem("lavapro:ocr-debug") === "1";
+  } catch {
+    return false;
+  }
+}
+
 /** Carrega o OCR antecipadamente (ex.: ao abrir a tela de novo atendimento). */
 export function preloadPlateOcr(): void {
   void getWorker().catch(() => undefined);
@@ -66,16 +75,22 @@ export function findPlateCandidates(text: string, mercosul: boolean): string[] {
   return found;
 }
 
+// Peso por posição do candidato na leitura: o 1º é a leitura em si; os seguintes
+// costumam ser a mesma placa "deslocada" (ex.: começando na 2ª letra).
+const POSITION_WEIGHT = [1, 0.25, 0.1];
+
+export type OcrReading = { candidates: string[]; confidence: number; weight?: number };
+
 /**
- * Soma os votos de cada leitura: a placa que aparece em mais variações (pesada
- * pela confiança do OCR) vence. Candidatos mais à esquerda pesam mais.
+ * Soma os votos de cada leitura: vence a placa que aparece em mais variações,
+ * pesada pela confiança do OCR e pela confiabilidade da variação (`weight`).
  */
-export function tallyVotes(readings: Array<{ candidates: string[]; confidence: number }>) {
+export function tallyVotes(readings: OcrReading[]) {
   const scores = new Map<string, { score: number; votes: number; confidence: number }>();
-  for (const { candidates, confidence } of readings) {
+  for (const { candidates, confidence, weight = 0.3 } of readings) {
     candidates.forEach((plate, index) => {
       const entry = scores.get(plate) ?? { score: 0, votes: 0, confidence: 0 };
-      entry.score += (0.3 + confidence) / (index + 1);
+      entry.score += (weight + confidence) * (POSITION_WEIGHT[index] ?? 0.05);
       entry.votes += 1;
       entry.confidence = Math.max(entry.confidence, confidence);
       scores.set(plate, entry);
@@ -95,22 +110,109 @@ function scaled(bitmap: ImageBitmap): HTMLCanvasElement {
   return canvas;
 }
 
-/** Última linha da faixa azul da placa Mercosul (0 se não houver faixa). */
-function mercosulBandBottom(source: HTMLCanvasElement): number {
-  const context = source.getContext("2d", { willReadFrequently: true })!;
-  const { data } = context.getImageData(0, 0, source.width, source.height);
-  let bottom = 0;
-  for (let y = 0; y < source.height; y++) {
+const isBlue = (data: Uint8ClampedArray, i: number) =>
+  data[i + 2]! > 120 && data[i + 2]! > data[i]! * 1.8 && data[i + 2]! > data[i + 1]! * 1.25;
+
+const median = (values: number[]) =>
+  values.length ? values.slice().sort((a, b) => a - b)[Math.floor(values.length / 2)]! : 0;
+
+/**
+ * Localiza a placa Mercosul pela faixa azul, corrige a inclinação e devolve só a
+ * linha dos caracteres. null quando não há faixa azul reconhecível.
+ */
+function locateMercosulCharacters(base: HTMLCanvasElement): HTMLCanvasElement | null {
+  const { width, height } = base;
+  const { data } = base
+    .getContext("2d", { willReadFrequently: true })!
+    .getImageData(0, 0, width, height);
+
+  // Linhas com bastante azul delimitam a faixa na vertical.
+  let top = -1;
+  let bottom = -1;
+  for (let y = 0; y < height; y++) {
     let blue = 0;
-    let samples = 0;
-    for (let x = 0; x < source.width; x += 4) {
-      const i = (y * source.width + x) * 4;
-      samples++;
-      if (data[i + 2]! > 110 && data[i + 2]! > data[i]! * 1.7) blue++;
+    for (let x = 0; x < width; x += 2) if (isBlue(data, (y * width + x) * 4)) blue++;
+    if (blue > (width / 2) * 0.12) {
+      if (top < 0) top = y;
+      bottom = y;
     }
-    if (blue / samples > 0.5) bottom = y;
   }
-  return bottom;
+  if (top < 0) return null;
+
+  // Colunas: maior trecho contínuo com azul entre essas linhas.
+  const strong: boolean[] = [];
+  let peak = 0;
+  const columns: number[] = [];
+  for (let x = 0; x < width; x++) {
+    let blue = 0;
+    for (let y = top; y <= bottom; y += 2) if (isBlue(data, (y * width + x) * 4)) blue++;
+    columns.push(blue);
+    peak = Math.max(peak, blue);
+  }
+  columns.forEach((value) => strong.push(value > peak * 0.25));
+  let left = 0;
+  let right = 0;
+  for (let x = 0, start = -1, gap = 0; x < width; x++) {
+    if (strong[x]) {
+      if (start < 0) start = x;
+      gap = 0;
+      if (x - start > right - left) [left, right] = [start, x];
+    } else if (start >= 0 && ++gap > 20) {
+      start = -1;
+      gap = 0;
+    }
+  }
+  const bandWidth = right - left;
+  if (bandWidth < width * 0.15) return null;
+
+  // Espessura e topo da faixa (medianas por coluna) e inclinação (regressão do topo).
+  const thickness: number[] = [];
+  const firstBlue: number[] = [];
+  const xs: number[] = [];
+  for (
+    let x = left + Math.round(bandWidth * 0.1);
+    x <= right - Math.round(bandWidth * 0.1);
+    x += 3
+  ) {
+    let count = 0;
+    let first = -1;
+    for (let y = Math.max(0, top - 80); y <= Math.min(height - 1, bottom + 80); y++) {
+      if (isBlue(data, (y * width + x) * 4)) {
+        count++;
+        if (first < 0) first = y;
+      }
+    }
+    if (count) {
+      thickness.push(count);
+      firstBlue.push(first);
+      xs.push(x);
+    }
+  }
+  if (xs.length < 5) return null;
+  const meanX = xs.reduce((a, b) => a + b, 0) / xs.length;
+  const meanY = firstBlue.reduce((a, b) => a + b, 0) / firstBlue.length;
+  let num = 0;
+  let den = 0;
+  xs.forEach((x, i) => {
+    num += (x - meanX) * (firstBlue[i]! - meanY);
+    den += (x - meanX) ** 2;
+  });
+  const angle = Math.atan(num / Math.max(1, den));
+  const bandHeight = Math.max(10, median(thickness));
+
+  // Linha dos caracteres: logo abaixo da faixa, ~2,5x a altura dela, já endireitada.
+  const chars = document.createElement("canvas");
+  chars.width = Math.round(bandWidth * 1.04);
+  chars.height = Math.round(bandHeight * 2.5);
+  const context = chars.getContext("2d")!;
+  context.fillStyle = "#fff";
+  context.fillRect(0, 0, chars.width, chars.height);
+  context.translate(chars.width / 2, chars.height / 2);
+  context.rotate(-angle);
+  const centerX = left + bandWidth / 2;
+  const centerY = median(firstBlue) + bandHeight * 1.05 + chars.height / 2;
+  context.drawImage(base, -centerX, -centerY);
+  return chars;
 }
 
 type Region = { x: number; y: number; w: number; h: number };
@@ -143,6 +245,66 @@ function prepare(source: HTMLCanvasElement, region: Region, threshold: number) {
   return canvas;
 }
 
+/** Filtro separável de mínimo/máximo em imagem binária (0 = escuro). */
+function spread(bin: Uint8Array, width: number, height: number, radius: number, dark: boolean) {
+  const pass = (source: Uint8Array, horizontal: boolean) => {
+    const out = new Uint8Array(source.length);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        let hit = false;
+        for (let k = -radius; k <= radius && !hit; k++) {
+          const xx = horizontal ? x + k : x;
+          const yy = horizontal ? y : y + k;
+          if (xx < 0 || yy < 0 || xx >= width || yy >= height) continue;
+          hit = dark ? source[yy * width + xx] === 0 : source[yy * width + xx] === 255;
+        }
+        out[y * width + x] = dark ? (hit ? 0 : 255) : hit ? 255 : 0;
+      }
+    }
+    return out;
+  };
+  return pass(pass(bin, true), false);
+}
+
+/**
+ * Preto e branco + fechamento morfológico: preenche o relevo "MERCOSUL" que
+ * fica dentro dos traços das letras e as deixa sólidas para o OCR.
+ */
+function solidCharacters(
+  source: HTMLCanvasElement,
+  threshold: number,
+  blur: number,
+  radius: number,
+) {
+  const canvas = document.createElement("canvas");
+  canvas.width = source.width;
+  canvas.height = source.height;
+  const context = canvas.getContext("2d", { willReadFrequently: true })!;
+  context.filter = blur ? `blur(${blur}px)` : "none";
+  context.drawImage(source, 0, 0);
+  context.filter = "none";
+  const image = context.getImageData(0, 0, canvas.width, canvas.height);
+  let bin = new Uint8Array(canvas.width * canvas.height);
+  for (let p = 0, i = 0; p < bin.length; p++, i += 4) {
+    const gray = 0.299 * image.data[i]! + 0.587 * image.data[i + 1]! + 0.114 * image.data[i + 2]!;
+    bin[p] = gray < threshold * 255 ? 0 : 255;
+  }
+  if (radius > 0) {
+    bin = spread(
+      spread(bin, canvas.width, canvas.height, radius, true),
+      canvas.width,
+      canvas.height,
+      radius,
+      false,
+    );
+  }
+  for (let p = 0, i = 0; p < bin.length; p++, i += 4) {
+    image.data[i] = image.data[i + 1] = image.data[i + 2] = bin[p]!;
+  }
+  context.putImageData(image, 0, 0);
+  return canvas;
+}
+
 /**
  * Confiança exibida: a maior entre a confiança do OCR e a fração de leituras
  * que concordaram (a do Tesseract sozinha subestima placas com marca d'água).
@@ -157,44 +319,49 @@ export async function readPlateWithOcr(file: Blob): Promise<OcrResult> {
   const base = scaled(bitmap);
   bitmap.close();
 
-  const bandBottom = mercosulBandBottom(base);
-  const mercosul = bandBottom > 0;
+  const characters = locateMercosulCharacters(base);
+  const mercosul = characters !== null;
   const full: Region = { x: 0, y: 0, w: 1, h: 1 };
-  const belowBand: Region = {
-    x: 0.04,
-    y: (bandBottom + 4) / base.height,
-    w: 0.92,
-    h: Math.max(0.1, 1 - (bandBottom + 4) / base.height - 0.02),
-  };
 
   const { PSM } = await import("tesseract.js");
-  // Variações escolhidas a partir de testes com placas reais (marca d'água forte
-  // e foto limpa); a ordem vai da mais barata/certeira para as de reforço.
-  const attempts: Array<{ region: Region; threshold: number; mode: string }> = [
-    { region: full, threshold: -1, mode: PSM.SINGLE_LINE },
-    { region: full, threshold: 0.5, mode: PSM.SINGLE_LINE },
-    { region: full, threshold: -1, mode: PSM.SPARSE_TEXT },
-    { region: full, threshold: 0.35, mode: PSM.SINGLE_LINE },
-    ...(mercosul
+  // Variações escolhidas a partir de testes com placas reais (foto limpa, marca
+  // d'água forte e foto inclinada no para-choque), da mais certeira à de reforço.
+  // weight: o recorte da placa já endireitado é mais confiável que a foto inteira.
+  const attempts: Array<{ image: () => HTMLCanvasElement; mode: string; weight?: number }> = [
+    ...(characters
       ? [
-          { region: belowBand, threshold: -1, mode: PSM.SPARSE_TEXT },
-          { region: belowBand, threshold: 0.5, mode: PSM.SPARSE_TEXT },
+          { image: () => solidCharacters(characters, 0.6, 0, 0), mode: PSM.SINGLE_LINE, weight: 1 },
+          { image: () => solidCharacters(characters, 0.6, 0, 3), mode: PSM.SINGLE_LINE, weight: 1 },
+          { image: () => solidCharacters(characters, 0.6, 2, 0), mode: PSM.SINGLE_LINE, weight: 1 },
         ]
+      : []),
+    { image: () => prepare(base, full, -1), mode: PSM.SINGLE_LINE },
+    { image: () => prepare(base, full, 0.5), mode: PSM.SINGLE_LINE },
+    { image: () => prepare(base, full, -1), mode: PSM.SPARSE_TEXT },
+    { image: () => prepare(base, full, 0.35), mode: PSM.SINGLE_LINE },
+    ...(characters
+      ? []
       : [
-          // Foto do carro inteiro: a placa costuma estar no centro ou embaixo.
-          { region: { x: 0.1, y: 0.35, w: 0.8, h: 0.5 }, threshold: -1, mode: PSM.SPARSE_TEXT },
-          { region: { x: 0, y: 0.5, w: 1, h: 0.5 }, threshold: -1, mode: PSM.SPARSE_TEXT },
+          // Sem faixa azul (placa antiga ou foto distante): centro e parte de baixo.
+          {
+            image: () => prepare(base, { x: 0.1, y: 0.35, w: 0.8, h: 0.5 }, -1),
+            mode: PSM.SPARSE_TEXT,
+          },
+          { image: () => prepare(base, { x: 0, y: 0.5, w: 1, h: 0.5 }, -1), mode: PSM.SPARSE_TEXT },
         ]),
   ];
 
   const worker = await getWorker();
-  const readings: Array<{ candidates: string[]; confidence: number }> = [];
+  const readings: OcrReading[] = [];
   for (const attempt of attempts) {
     await worker.setParameters({ tessedit_pageseg_mode: attempt.mode as never });
-    const { data } = await worker.recognize(prepare(base, attempt.region, attempt.threshold));
+    const { data } = await worker.recognize(attempt.image());
+    if (debugEnabled())
+      console.info("[OCR]", attempts.indexOf(attempt), JSON.stringify(data.text), data.confidence);
     readings.push({
       candidates: findPlateCandidates(data.text, mercosul),
       confidence: Math.max(0, Math.min(1, data.confidence / 100)),
+      ...(attempt.weight ? { weight: attempt.weight } : {}),
     });
     const [leader, runnerUp] = tallyVotes(readings);
     // Para cedo quando há consenso claro entre leituras.
