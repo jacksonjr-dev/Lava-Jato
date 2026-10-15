@@ -31,6 +31,8 @@ export const Route = createFileRoute("/auth")({
       { property: "og:description", content: "Acesse o painel do seu lava-jato." },
     ],
   }),
+  validateSearch: (search: Record<string, unknown>): { modo?: "cadastro" } =>
+    search["modo"] === "cadastro" ? { modo: "cadastro" } : {},
   component: AuthPage,
 });
 
@@ -38,7 +40,10 @@ function AuthPage() {
   const navigate = useNavigate();
   const getDemoLoginHint = useServerFn(getDemoOwnerLoginHint);
   const verifyBusiness = useServerFn(verifyOwnerBusiness);
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const search = Route.useSearch();
+  const [mode, setMode] = useState<"login" | "signup">(
+    search.modo === "cadastro" ? "signup" : "login",
+  );
   const [businessName, setBusinessName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
