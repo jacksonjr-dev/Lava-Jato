@@ -16,9 +16,7 @@ describe("seleção de serviços", () => {
     expect(isWashService(services[0]!)).toBe(true);
     expect(isWashService(services[1]!)).toBe(true);
     expect(isWashService(services[2]!)).toBe(false);
-    expect(isWashService({ id: "eco", nome: "Limpeza ecológica", categoria: "LAVAGEM" })).toBe(
-      true,
-    );
+    expect(isWashService({ nome: "Limpeza ecológica", categoria: "LAVAGEM" })).toBe(true);
   });
 
   it("troca a lavagem simples pela completa e mantém o polimento", () => {

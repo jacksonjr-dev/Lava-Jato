@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { normalizePlate } from "./plate";
 import { calculateFinancialStats, financialPeriod } from "./financial";
+import { assertFeature, resolveSubscription, type Feature, type Subscription } from "./plans";
 
 export type DB = SupabaseClient<Database>;
 export type Role = Database["public"]["Enums"]["app_role"];
@@ -31,6 +32,32 @@ export async function requireManager(sb: DB, userId: string): Promise<Membership
     throw new Error("Apenas proprietário ou gerente podem executar esta ação.");
   }
   return m;
+}
+
+export async function loadSubscription(sb: DB, tenantId: string): Promise<Subscription> {
+  const { data, error } = await sb
+    .from("tenants")
+    .select("plan, trial_ends_at, plan_expires_at")
+    .eq("id", tenantId)
+    .single();
+  if (error) throw new Error(error.message);
+  return resolveSubscription(data);
+}
+
+export async function requireFeature(sb: DB, tenantId: string, feature: Feature) {
+  const subscription = await loadSubscription(sb, tenantId);
+  assertFeature(subscription, feature);
+  return subscription;
+}
+
+export async function ordersThisMonth(sb: DB, tenantId: string): Promise<number> {
+  const { count, error } = await sb
+    .from("service_orders")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId)
+    .gte("created_at", financialPeriod(new Date()).startMonth.toISOString());
+  if (error) throw new Error(error.message);
+  return count ?? 0;
 }
 
 export const DEFAULT_SERVICES = [
@@ -90,34 +117,6 @@ export async function recognizePlateFromImage(
   } catch {
     return { plate: "", confidence: 0 };
   }
-}
-
-export async function recalcOrder(sb: DB, tenantId: string, orderId: string) {
-  const { data: items, error: itemsError } = await sb
-    .from("service_order_items")
-    .select("preco, quantidade")
-    .eq("tenant_id", tenantId)
-    .eq("order_id", orderId);
-  if (itemsError) throw new Error(itemsError.message);
-
-  const subtotal = (items ?? []).reduce((acc, i) => acc + Number(i.preco) * (i.quantidade ?? 1), 0);
-
-  const { data: order, error: orderError } = await sb
-    .from("service_orders")
-    .select("desconto, acrescimo")
-    .eq("tenant_id", tenantId)
-    .eq("id", orderId)
-    .single();
-  if (orderError) throw new Error(orderError.message);
-
-  const total = Math.max(0, subtotal - Number(order.desconto) + Number(order.acrescimo));
-  const { error } = await sb
-    .from("service_orders")
-    .update({ subtotal, total })
-    .eq("tenant_id", tenantId)
-    .eq("id", orderId);
-  if (error) throw new Error(error.message);
-  return { subtotal, total };
 }
 
 export async function loadOrder(sb: DB, tenantId: string, orderId: string) {

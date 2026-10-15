@@ -1,4 +1,4 @@
-import type { TDocumentDefinitions } from "pdfmake/interfaces";
+import type { CustomTableLayout, TDocumentDefinitions } from "pdfmake/interfaces";
 import type { Row } from "write-excel-file/browser";
 
 type MonthlyFinancialReport = {
@@ -119,8 +119,8 @@ export async function exportMonthlyPdf(data: MonthlyFinancialReport): Promise<vo
   pdfMake.addVirtualFileSystem(pdfFontsModule.default);
   const money = (value: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-  const tableLayout = {
-    fillColor: (rowIndex: number) => (rowIndex === 0 ? "#0D1B2A" : undefined),
+  const tableLayout: CustomTableLayout = {
+    fillColor: (rowIndex: number) => (rowIndex === 0 ? "#0D1B2A" : null),
     hLineColor: "#D7E0E7",
     vLineColor: "#D7E0E7",
     paddingLeft: () => 8,

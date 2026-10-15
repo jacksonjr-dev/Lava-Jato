@@ -230,6 +230,42 @@ export type Database = {
           },
         ];
       };
+      platform_admins: {
+        Row: {
+          created_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      portal_login_attempts: {
+        Row: {
+          failures: number;
+          key: string;
+          locked_until: string | null;
+          window_started_at: string;
+        };
+        Insert: {
+          failures?: number;
+          key: string;
+          locked_until?: string | null;
+          window_started_at?: string;
+        };
+        Update: {
+          failures?: number;
+          key?: string;
+          locked_until?: string | null;
+          window_started_at?: string;
+        };
+        Relationships: [];
+      };
       profiles: {
         Row: {
           created_at: string;
@@ -521,9 +557,12 @@ export type Database = {
           pix_city: string | null;
           pix_key: string | null;
           pix_receiver_name: string | null;
+          plan: string;
+          plan_expires_at: string | null;
           public_listing: boolean;
           slug: string;
           telefone: string | null;
+          trial_ends_at: string | null;
           updated_at: string;
         };
         Insert: {
@@ -538,9 +577,12 @@ export type Database = {
           pix_city?: string | null;
           pix_key?: string | null;
           pix_receiver_name?: string | null;
+          plan?: string;
+          plan_expires_at?: string | null;
           public_listing?: boolean;
           slug: string;
           telefone?: string | null;
+          trial_ends_at?: string | null;
           updated_at?: string;
         };
         Update: {
@@ -555,9 +597,12 @@ export type Database = {
           pix_city?: string | null;
           pix_key?: string | null;
           pix_receiver_name?: string | null;
+          plan?: string;
+          plan_expires_at?: string | null;
           public_listing?: boolean;
           slug?: string;
           telefone?: string | null;
+          trial_ends_at?: string | null;
           updated_at?: string;
         };
         Relationships: [];
@@ -668,6 +713,14 @@ export type Database = {
           p_placa: string;
         };
         Returns: Json;
+      };
+      portal_locked_until: {
+        Args: { p_keys: string[] };
+        Returns: string | null;
+      };
+      portal_record_failure: {
+        Args: { p_key: string; p_max_failures: number; p_window_seconds: number };
+        Returns: undefined;
       };
       register_order_payment_atomic: {
         Args: { p_metodo: Database["public"]["Enums"]["payment_method"]; p_order_id: string };

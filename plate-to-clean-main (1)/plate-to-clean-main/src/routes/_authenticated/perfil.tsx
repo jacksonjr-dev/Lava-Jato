@@ -228,22 +228,22 @@ function BusinessProfile() {
                   return (
                     <div
                       key={key}
-                      className="grid gap-3 border-b border-border/70 p-4 last:border-b-0 sm:grid-cols-[150px_1fr] sm:items-center"
+                      className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-border/70 p-4 last:border-b-0"
                     >
-                      <div className="flex items-center justify-between gap-3 sm:justify-start">
+                      <div className="flex items-center gap-3">
                         <Switch
                           id={`business-hours-${key}`}
                           checked={day.enabled}
                           onCheckedChange={(enabled) => updateBusinessDay(key, { enabled })}
                           aria-label={`${day.enabled ? "Fechar" : "Abrir"} ${label}`}
                         />
-                        <Label htmlFor={`business-hours-${key}`} className="min-w-28 sm:min-w-0">
+                        <Label htmlFor={`business-hours-${key}`} className="cursor-pointer">
                           {label}
                         </Label>
                       </div>
 
                       {day.enabled ? (
-                        <div className="flex items-center gap-2 sm:justify-end">
+                        <div className="flex w-full items-center gap-2 sm:w-auto">
                           <Label className="sr-only" htmlFor={`business-hours-${key}-open`}>
                             Abertura de {label}
                           </Label>
@@ -273,7 +273,9 @@ function BusinessProfile() {
                           />
                         </div>
                       ) : (
-                        <p className="text-xs text-muted-foreground sm:text-right">Fechado</p>
+                        <span className="rounded-full border border-border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Fechado
+                        </span>
                       )}
                     </div>
                   );

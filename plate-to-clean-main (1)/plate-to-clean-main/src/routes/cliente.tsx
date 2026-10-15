@@ -24,6 +24,10 @@ import { brl, dateBR, normalizePlate, type OrderStatus } from "@/lib/plate";
 import { getDemoBusiness, isDemoEnabled } from "@/lib/demo-auth";
 import { WashBrand } from "@/components/app/wash-brand";
 import { WashHoseBackdrop } from "@/components/app/wash-hose-backdrop";
+import { PlateBadge } from "@/components/app/plate-badge";
+import { OrderTimeline } from "@/components/app/order-timeline";
+import { Reveal } from "@/components/app/motion";
+import { m } from "motion/react";
 import {
   BUSINESS_DAYS,
   formatBusinessDay,
@@ -44,14 +48,6 @@ export const Route = createFileRoute("/cliente")({
   }),
   component: ClientPortal,
 });
-
-const FLOW_STATUSES: OrderStatus[] = [
-  "AGUARDANDO",
-  "EM_LAVAGEM",
-  "AGUARDANDO_PAGAMENTO",
-  "PAGO",
-  "ENTREGUE",
-];
 
 const CLIENT_STATUS_LABEL: Record<OrderStatus, string> = {
   AGUARDANDO: "Aguardando início",
@@ -85,7 +81,7 @@ function ClientBusinessHours({
   legacyValue,
 }: {
   value: unknown;
-  legacyValue?: string | null;
+  legacyValue?: string | null | undefined;
 }) {
   const [expanded, setExpanded] = useState(false);
   const hours = normalizeBusinessHours(value);
@@ -222,22 +218,36 @@ function ClientPortal() {
         <main className="page-enter mx-auto max-w-5xl px-5 py-8 md:py-12">
           <div className="grid gap-8 md:grid-cols-[1.25fr_0.75fr]">
             <section>
-              <p className="text-sm text-muted-foreground">Olá, {data.customer?.nome}</p>
-              <h1 className="mt-2 text-4xl font-bold tracking-[-0.06em] md:text-6xl">
-                {data.vehicle.placa}
-              </h1>
+              <p className="text-sm text-muted-foreground">Olá, {data.customer?.nome} 👋</p>
+              <h1 className="sr-only">Veículo {data.vehicle.placa}</h1>
+              <m.div
+                initial={{ opacity: 0, y: 16, rotate: -2 }}
+                animate={{ opacity: 1, y: 0, rotate: 0 }}
+                transition={{ type: "spring", stiffness: 220, damping: 20 }}
+                className="mt-3"
+              >
+                <PlateBadge plate={data.vehicle.placa} size="lg" />
+              </m.div>
               <p className="mt-3 text-sm text-muted-foreground">
                 {[data.vehicle.marca, data.vehicle.modelo, data.vehicle.cor]
                   .filter(Boolean)
                   .join(" · ")}
               </p>
-              <p className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
-                <RefreshCw className={`size-3.5 ${liveQuery.isFetching ? "animate-spin" : ""}`} />
-                Status atualizado automaticamente a cada 5 segundos
-              </p>
+              {activeOrder ? (
+                <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-[11px] font-semibold text-primary">
+                  <span className="relative flex size-2">
+                    <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-75" />
+                    <span className="relative inline-flex size-2 rounded-full bg-primary" />
+                  </span>
+                  AO VIVO · atualiza sozinho
+                  <RefreshCw
+                    className={`size-3 ${liveQuery.isFetching ? "animate-spin" : "opacity-60"}`}
+                  />
+                </p>
+              ) : null}
             </section>
 
-            <section className="reveal-stagger grid grid-cols-2 overflow-hidden border border-border bg-card">
+            <section className="reveal-stagger grid h-fit grid-cols-2 overflow-hidden rounded-2xl border border-border bg-card">
               <Metric label="ATENDIMENTOS" value={String(data.summary.totalOrders)} />
               <Metric label="TOTAL PAGO" value={brl(data.summary.totalSpent)} />
               <Metric label="ÚLTIMA VISITA" value={dateBR(data.summary.lastVisit)} wide />
@@ -245,43 +255,56 @@ function ClientPortal() {
           </div>
 
           {activeOrder ? (
-            <section className="interactive-panel mt-10 overflow-hidden border border-primary/50 bg-card">
-              <div className="flex flex-wrap items-start justify-between gap-4 bg-brand px-5 py-4 text-primary-foreground">
-                <div>
-                  <p className="text-xs font-bold">
-                    {readyForPickup ? "VEÍCULO PRONTO PARA RETIRADA" : "ATENDIMENTO EM CURSO"}
-                  </p>
-                  <h2 className="mt-1 text-2xl font-bold">#{activeOrder.numero}</h2>
-                </div>
-                <p className="rounded-xl border border-primary-foreground/30 bg-background/15 px-3 py-2 text-xs font-bold">
-                  {CLIENT_STATUS_LABEL[activeOrder.status as OrderStatus]}
-                </p>
-              </div>
-              <div className="p-5 md:p-7">
-                <StatusLine status={activeOrder.status as OrderStatus} />
-                <PickupNotice status={activeOrder.status as OrderStatus} pix={data.pix} />
-                <div className="mt-7 grid gap-5 border-t border-border/60 pt-5 md:grid-cols-[1fr_auto]">
+            <Reveal className="mt-10">
+              <section className="overflow-hidden rounded-3xl border border-primary/50 bg-card shadow-glow">
+                <div className="flex flex-wrap items-start justify-between gap-4 bg-brand px-5 py-4 text-primary-foreground">
                   <div>
-                    <p className="text-xs text-muted-foreground">Serviços</p>
-                    <div className="mt-3 space-y-2">
-                      {activeOrder.service_order_items.map((item) => (
-                        <div key={item.id} className="flex items-center gap-2 text-sm">
-                          <Wrench className="size-4 text-primary" />
-                          {item.nome}
-                        </div>
-                      ))}
+                    <p className="text-xs font-bold">
+                      {readyForPickup ? "VEÍCULO PRONTO PARA RETIRADA" : "ATENDIMENTO EM CURSO"}
+                    </p>
+                    <h2 className="mt-1 text-2xl font-bold">#{activeOrder.numero}</h2>
+                  </div>
+                  <p className="rounded-xl border border-primary-foreground/30 bg-background/15 px-3 py-2 text-xs font-bold">
+                    {CLIENT_STATUS_LABEL[activeOrder.status as OrderStatus]}
+                  </p>
+                </div>
+                <div className="p-5 md:p-7">
+                  <OrderTimeline
+                    status={activeOrder.status as OrderStatus}
+                    title="Onde está o seu carro"
+                  />
+                  <PickupNotice status={activeOrder.status as OrderStatus} pix={data.pix} />
+                  <div className="mt-7 grid gap-5 border-t border-border/60 pt-5 md:grid-cols-[1fr_auto]">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Serviços</p>
+                      <div className="mt-3 space-y-2">
+                        {activeOrder.service_order_items.map((item) => (
+                          <div key={item.id} className="flex items-center gap-2 text-sm">
+                            <Wrench className="size-4 text-primary" />
+                            {item.nome}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="md:text-right">
+                      <p className="text-xs text-muted-foreground">Total</p>
+                      <p className="mt-2 text-3xl font-bold tabular-nums">
+                        {brl(activeOrder.total)}
+                      </p>
                     </div>
                   </div>
-                  <div className="md:text-right">
-                    <p className="text-xs text-muted-foreground">Total</p>
-                    <p className="mt-2 text-3xl font-bold tabular-nums">{brl(activeOrder.total)}</p>
-                  </div>
                 </div>
-              </div>
-            </section>
+              </section>
+            </Reveal>
           ) : (
-            <section className="mt-10 rounded-3xl border border-border/60 bg-card p-6 shadow-card">
-              <p className="text-sm text-muted-foreground">Nenhum atendimento em andamento.</p>
+            <section className="mt-10 flex items-center gap-4 rounded-3xl border border-border/60 bg-card p-6 shadow-card">
+              <Car className="size-8 shrink-0 text-primary" strokeWidth={1.5} />
+              <div>
+                <p className="font-semibold">Nenhum atendimento em andamento</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Quando o seu carro chegar ao lava-jato, o andamento aparece aqui.
+                </p>
+              </div>
             </section>
           )}
 
@@ -294,7 +317,7 @@ function ClientPortal() {
               <ReceiptText className="size-6 text-muted-foreground" />
             </div>
 
-            <div className="reveal-stagger mt-3 divide-y divide-border border border-border bg-card px-5">
+            <div className="reveal-stagger mt-3 divide-y divide-border rounded-2xl border border-border bg-card px-5">
               {data.orders.map((order) => (
                 <article key={order.id} className="grid gap-4 py-5 md:grid-cols-[110px_1fr_140px]">
                   <div>
@@ -549,42 +572,6 @@ function Metric({ label, value, wide }: { label: string; value: string; wide?: b
       <p className="text-[10px] text-muted-foreground">{label}</p>
       <p className="mt-2 text-lg font-bold tabular-nums">{value}</p>
     </div>
-  );
-}
-
-function StatusLine({ status }: { status: OrderStatus }) {
-  if (status === "CANCELADO") {
-    return (
-      <p className="rounded-xl border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-        Atendimento cancelado.
-      </p>
-    );
-  }
-  const visibleStatus =
-    status === "EM_FINALIZACAO"
-      ? "EM_LAVAGEM"
-      : status === "FINALIZADO"
-        ? "AGUARDANDO_PAGAMENTO"
-        : status;
-  const current = FLOW_STATUSES.indexOf(visibleStatus);
-  return (
-    <ol className="grid gap-px overflow-hidden bg-border/60 sm:grid-cols-5">
-      {FLOW_STATUSES.map((item, index) => {
-        const complete = index <= current;
-        return (
-          <li
-            key={item}
-            className={`min-h-24 bg-background/70 p-3 transition-colors ${complete ? "text-primary" : "text-muted-foreground/60"} ${index === current ? "status-current" : ""}`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tabular-nums">{String(index + 1).padStart(2, "0")}</span>
-              {index < current ? <Check className="size-4" /> : null}
-            </div>
-            <p className="mt-5 text-[10px] leading-4">{CLIENT_STATUS_LABEL[item].toUpperCase()}</p>
-          </li>
-        );
-      })}
-    </ol>
   );
 }
 

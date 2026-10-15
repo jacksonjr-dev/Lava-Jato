@@ -94,4 +94,27 @@ describe("migrações de integridade", () => {
     expect(migration).toContain("'LAVAGEM'");
     expect(migration).toContain("'ADICIONAL'");
   });
+
+  it("impede gravação direta em pagamentos, itens e valores da OS", () => {
+    const migration = readFileSync(
+      resolve("supabase/migrations/20261015120000_security_hardening.sql"),
+      "utf8",
+    );
+    expect(migration).toContain("DROP POLICY IF EXISTS payments_all ON public.payments;");
+    expect(migration).toContain(
+      "REVOKE INSERT, UPDATE, DELETE ON public.payments FROM authenticated, anon;",
+    );
+    expect(migration).toContain(
+      "REVOKE INSERT, UPDATE, DELETE ON public.service_order_items FROM authenticated, anon;",
+    );
+    expect(migration).toContain(
+      "GRANT UPDATE (status, finished_at, observacoes) ON public.service_orders TO authenticated;",
+    );
+    expect(migration).toContain("Registre o pagamento antes de marcar a ordem como paga.");
+    expect(migration).toContain("DROP POLICY IF EXISTS tenant_insert ON public.tenants;");
+    expect(migration).toContain(
+      "DROP POLICY IF EXISTS members_insert_self ON public.tenant_members;",
+    );
+    expect(migration).toMatch(/ON CONFLICT \(id\) DO UPDATE SET public = FALSE/);
+  });
 });
