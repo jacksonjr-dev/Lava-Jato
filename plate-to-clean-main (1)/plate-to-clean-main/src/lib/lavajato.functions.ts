@@ -1,10 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   dashboardStats,
   getMembership,
   loadOrder,
-  recalcOrder,
   recognizePlateFromImage,
   requireManager,
   requireMembership,
@@ -46,6 +46,8 @@ import { matchesBusinessIdentity } from "./business-identity";
 
 type OrderStatus = Database["public"]["Enums"]["order_status"];
 type PaymentMethod = Database["public"]["Enums"]["payment_method"];
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function phoneDigits(value: string | null | undefined): string {
   return (value ?? "").replace(/\D/g, "");
@@ -164,21 +166,22 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
       const placa = normalizePlate(data.placa ?? "");
       const telefone = phoneDigits(data.telefone);
       if (!tenantId) throw new Error("Escolha o lava-jato onde o serviço foi realizado.");
-      const attemptKey = security.portalAttemptKey(tenantId, placa, telefone);
-      const plateAttemptKey = security.portalAttemptKey(tenantId, placa, "*");
-      security.assertPortalRateLimit(attemptKey);
-      security.assertPortalRateLimit(plateAttemptKey);
+      const attemptRules = security.portalAttemptRules(
+        security.requestClientIp(getRequest()?.headers),
+        tenantId,
+        placa,
+        telefone,
+      );
+      await security.assertPortalAttemptsAllowed(attemptRules);
       if (placa.length !== 7 || telefone.length < 10 || telefone.length > 11) {
-        security.recordPortalFailure(attemptKey);
-        security.recordPortalFailure(plateAttemptKey);
+        await security.recordPortalAttemptFailure(attemptRules);
         throw new Error("Informe a placa e o telefone usados no cadastro.");
       }
 
       if (isDemoServerMode()) {
         try {
           const portal = demoClientPortal(tenantId, placa, telefone);
-          security.clearPortalFailures(attemptKey);
-          security.clearPortalFailures(plateAttemptKey);
+          await security.clearPortalAttemptFailures(attemptRules);
           accessToken = security.issueClientPortalToken(
             portal.vehicle.id,
             portal.vehicle.tenant_id,
@@ -198,10 +201,14 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
             accessToken,
           };
         } catch {
-          security.recordPortalFailure(attemptKey);
-          security.recordPortalFailure(plateAttemptKey);
+          await security.recordPortalAttemptFailure(attemptRules);
           throw new Error("Placa ou telefone não encontrados.");
         }
+      }
+
+      if (!UUID_PATTERN.test(tenantId)) {
+        await security.recordPortalAttemptFailure(attemptRules);
+        throw new Error("Placa ou telefone não encontrados.");
       }
 
       const { data: candidates, error: vehicleError } = await supabaseAdmin
@@ -216,8 +223,7 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
         (candidate) => phoneDigits(candidate.customers?.telefone) === telefone,
       );
       if (matches.length !== 1) {
-        security.recordPortalFailure(attemptKey);
-        security.recordPortalFailure(plateAttemptKey);
+        await security.recordPortalAttemptFailure(attemptRules);
         throw new Error(
           matches.length > 1
             ? "Existe mais de um cadastro com esses dados. Procure o lava-jato."
@@ -232,12 +238,10 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
         .eq("vehicle_id", vehicle.id);
       if (orderAccessError) throw new Error("Não foi possível consultar seus atendimentos.");
       if (!orderCount) {
-        security.recordPortalFailure(attemptKey);
-        security.recordPortalFailure(plateAttemptKey);
+        await security.recordPortalAttemptFailure(attemptRules);
         throw new Error("Placa ou telefone não encontrados.");
       }
-      security.clearPortalFailures(attemptKey);
-      security.clearPortalFailures(plateAttemptKey);
+      await security.clearPortalAttemptFailures(attemptRules);
       accessToken = security.issueClientPortalToken(vehicle.id, vehicle.tenant_id);
     }
 
@@ -278,8 +282,15 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
             business_hours: tenant.business_hours,
           }
         : null,
-      customer: vehicle.customers,
-      vehicle,
+      // Só o que a tela do cliente exibe; telefone e e-mail não voltam ao navegador.
+      customer: vehicle.customers ? { nome: vehicle.customers.nome } : null,
+      vehicle: {
+        id: vehicle.id,
+        placa: vehicle.placa,
+        marca: vehicle.marca,
+        modelo: vehicle.modelo,
+        cor: vehicle.cor,
+      },
       orders: history,
       summary: {
         totalOrders: history.length,
@@ -364,8 +375,8 @@ export const updateTenantProfile = createServerFn({ method: "POST" })
       } catch {
         throw new Error("Informe um link válido para o logo.");
       }
-      if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-        throw new Error("O link do logo deve começar com http:// ou https://.");
+      if (parsedUrl.protocol !== "https:") {
+        throw new Error("O link do logo deve começar com https://.");
       }
     }
 
@@ -598,6 +609,8 @@ export const recognizePlate = createServerFn({ method: "POST" })
     if (isDemoServerMode()) return { plate: "ABC1D23", confidence: 0.98 };
     await requireMembership(context.supabase, context.userId);
     if (!data.image?.startsWith("data:image/")) throw new Error("Imagem inválida.");
+    // ~6 MB de imagem em base64; evita enviar arquivos enormes (e caros) à API de visão.
+    if (data.image.length > 8_000_000) throw new Error("Imagem muito grande. Tire outra foto.");
     return recognizePlateFromImage(data.image);
   });
 
@@ -855,57 +868,6 @@ export const getOrder = createServerFn({ method: "POST" })
     if (isDemoServerMode()) return demoGetOrder(data.id);
     const { tenantId } = await requireMembership(context.supabase, context.userId);
     return loadOrder(context.supabase, tenantId, data.id);
-  });
-
-export const addOrderItems = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .validator((data: { order_id: string; service_ids: string[] }) => data)
-  .handler(async ({ data, context }) => {
-    const sb = context.supabase;
-    const { tenantId } = await requireMembership(sb, context.userId);
-    const { data: order, error: oErr } = await sb
-      .from("service_orders")
-      .select("id, status")
-      .eq("id", data.order_id)
-      .eq("tenant_id", tenantId)
-      .maybeSingle();
-    if (oErr) throw new Error(oErr.message);
-    if (!order) throw new Error("Atendimento não encontrado.");
-    if (["PAGO", "ENTREGUE", "CANCELADO"].includes(order.status)) {
-      throw new Error("Não é possível alterar um atendimento finalizado.");
-    }
-
-    const ids = [...new Set(data.service_ids ?? [])];
-    if (!ids.length) throw new Error("Selecione ao menos um serviço.");
-    const { data: services, error: sErr } = await sb
-      .from("services")
-      .select("id, nome, preco, categoria")
-      .eq("tenant_id", tenantId)
-      .eq("ativo", true)
-      .in("id", ids);
-    if (sErr) throw new Error(sErr.message);
-    if (!services?.length || services.length !== ids.length) throw new Error("Serviços inválidos.");
-
-    const { data: existingItems, error: existingItemsError } = await sb
-      .from("service_order_items")
-      .select("id, nome")
-      .eq("tenant_id", tenantId)
-      .eq("order_id", order.id);
-    if (existingItemsError) throw new Error(existingItemsError.message);
-    assertCompatibleServices([...(existingItems ?? []), ...services]);
-
-    const { error } = await sb.from("service_order_items").insert(
-      services.map((s) => ({
-        tenant_id: tenantId,
-        order_id: order.id,
-        service_id: s.id,
-        nome: s.nome,
-        preco: s.preco,
-        quantidade: 1,
-      })),
-    );
-    if (error) throw new Error(error.message);
-    return recalcOrder(sb, tenantId, order.id);
   });
 
 export const updateOrderStatus = createServerFn({ method: "POST" })

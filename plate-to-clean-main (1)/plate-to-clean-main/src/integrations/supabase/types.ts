@@ -230,6 +230,27 @@ export type Database = {
           },
         ];
       };
+      portal_login_attempts: {
+        Row: {
+          failures: number;
+          key: string;
+          locked_until: string | null;
+          window_started_at: string;
+        };
+        Insert: {
+          failures?: number;
+          key: string;
+          locked_until?: string | null;
+          window_started_at?: string;
+        };
+        Update: {
+          failures?: number;
+          key?: string;
+          locked_until?: string | null;
+          window_started_at?: string;
+        };
+        Relationships: [];
+      };
       profiles: {
         Row: {
           created_at: string;
@@ -668,6 +689,14 @@ export type Database = {
           p_placa: string;
         };
         Returns: Json;
+      };
+      portal_locked_until: {
+        Args: { p_keys: string[] };
+        Returns: string | null;
+      };
+      portal_record_failure: {
+        Args: { p_key: string; p_max_failures: number; p_window_seconds: number };
+        Returns: undefined;
       };
       register_order_payment_atomic: {
         Args: { p_metodo: Database["public"]["Enums"]["payment_method"]; p_order_id: string };

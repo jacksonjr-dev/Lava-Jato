@@ -1,10 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  assertPortalAttemptsAllowed,
   assertPortalRateLimit,
+  clearPortalAttemptFailures,
   clearPortalFailures,
   issueClientPortalToken,
   portalAttemptKey,
+  portalAttemptRules,
+  recordPortalAttemptFailure,
   recordPortalFailure,
+  requestClientIp,
   verifyClientPortalToken,
 } from "./client-portal.server";
 
@@ -56,5 +61,42 @@ describe("segurança do portal do cliente", () => {
     expect(portalAttemptKey("tenant-1", "ABC1D23", "85999991234")).not.toBe(
       portalAttemptKey("tenant-2", "ABC1D23", "85999991234"),
     );
+  });
+
+  it("limita por IP, por placa e pela combinação placa + telefone", async () => {
+    process.env["DEMO_MODE"] = "true";
+    const rules = portalAttemptRules("203.0.113.9", "tenant-3", "ABC1D23", "85999990000");
+    expect(rules.map((rule) => rule.maxAttempts)).toEqual([20, 10, 5]);
+
+    for (let attempt = 0; attempt < 5; attempt += 1) await recordPortalAttemptFailure(rules);
+    await expect(assertPortalAttemptsAllowed(rules)).rejects.toThrow("Muitas tentativas");
+
+    await clearPortalAttemptFailures(rules);
+    await expect(assertPortalAttemptsAllowed(rules)).resolves.toBeUndefined();
+  });
+
+  it("bloqueia o IP que testa muitas placas diferentes", async () => {
+    process.env["DEMO_MODE"] = "true";
+    for (let plate = 0; plate < 20; plate += 1) {
+      await recordPortalAttemptFailure(
+        portalAttemptRules(
+          "198.51.100.7",
+          "tenant-4",
+          `ABC1D${String(plate).padStart(2, "0")}`,
+          "85",
+        ),
+      );
+    }
+    await expect(
+      assertPortalAttemptsAllowed(portalAttemptRules("198.51.100.7", "tenant-4", "XYZ9Z99", "85")),
+    ).rejects.toThrow("Muitas tentativas");
+  });
+
+  it("lê o IP do cliente pelos cabeçalhos da borda", () => {
+    expect(requestClientIp(new Headers({ "x-forwarded-for": "203.0.113.1, 10.0.0.1" }))).toBe(
+      "203.0.113.1",
+    );
+    expect(requestClientIp(new Headers({ "x-real-ip": "203.0.113.2" }))).toBe("203.0.113.2");
+    expect(requestClientIp(undefined)).toBe("desconhecido");
   });
 });

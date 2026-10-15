@@ -92,34 +92,6 @@ export async function recognizePlateFromImage(
   }
 }
 
-export async function recalcOrder(sb: DB, tenantId: string, orderId: string) {
-  const { data: items, error: itemsError } = await sb
-    .from("service_order_items")
-    .select("preco, quantidade")
-    .eq("tenant_id", tenantId)
-    .eq("order_id", orderId);
-  if (itemsError) throw new Error(itemsError.message);
-
-  const subtotal = (items ?? []).reduce((acc, i) => acc + Number(i.preco) * (i.quantidade ?? 1), 0);
-
-  const { data: order, error: orderError } = await sb
-    .from("service_orders")
-    .select("desconto, acrescimo")
-    .eq("tenant_id", tenantId)
-    .eq("id", orderId)
-    .single();
-  if (orderError) throw new Error(orderError.message);
-
-  const total = Math.max(0, subtotal - Number(order.desconto) + Number(order.acrescimo));
-  const { error } = await sb
-    .from("service_orders")
-    .update({ subtotal, total })
-    .eq("tenant_id", tenantId)
-    .eq("id", orderId);
-  if (error) throw new Error(error.message);
-  return { subtotal, total };
-}
-
 export async function loadOrder(sb: DB, tenantId: string, orderId: string) {
   const { data: order, error } = await sb
     .from("service_orders")
