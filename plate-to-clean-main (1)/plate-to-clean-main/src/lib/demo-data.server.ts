@@ -186,11 +186,11 @@ export function isDemoServerMode(): boolean {
   return (
     process.env["DEMO_MODE"] === "true" ||
     process.env["VITE_DEMO_MODE"] === "true" ||
-    import.meta.env.VITE_DEMO_MODE === "true"
+    import.meta.env["VITE_DEMO_MODE"] === "true"
   );
 }
 
-export let demoServices = [
+export let demoServices: DemoService[] = [
   {
     id: "svc-1",
     tenant_id: tenantId,
@@ -229,7 +229,7 @@ export let demoServices = [
   },
 ];
 
-type DemoService = (typeof demoServices)[number];
+type DemoService = Database["public"]["Tables"]["services"]["Row"];
 
 export function demoCreateService(data: {
   nome: string;
@@ -255,13 +255,17 @@ export function demoCreateService(data: {
 }
 
 export function demoUpdateService(
-  data: { id: string } & Partial<
-    Pick<DemoService, "nome" | "preco" | "duracao_min" | "descricao" | "categoria" | "ativo">
-  >,
+  data: { id: string } & {
+    [K in "nome" | "preco" | "duracao_min" | "descricao" | "categoria" | "ativo"]?:
+      DemoService[K] | undefined;
+  },
 ) {
   const current = demoServices.find((service) => service.id === data.id);
   if (!current) throw new Error("Serviço não encontrado.");
-  const updated = { ...current, ...data, updated_at: now() } as DemoService;
+  const patch = Object.fromEntries(
+    Object.entries(data).filter(([, value]) => value !== undefined),
+  ) as Partial<DemoService>;
+  const updated: DemoService = { ...current, ...patch, updated_at: now() };
   demoServices = demoServices.map((service) => (service.id === data.id ? updated : service));
   return updated;
 }

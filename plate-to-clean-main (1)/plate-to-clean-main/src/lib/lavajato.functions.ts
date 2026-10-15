@@ -121,7 +121,12 @@ export const searchPublicTenants = createServerFn({ method: "GET" })
 
 export const clientPortalLogin = createServerFn({ method: "POST" })
   .validator(
-    (data: { tenantId?: string; placa?: string; telefone?: string; accessToken?: string }) => data,
+    (data: {
+      tenantId?: string | undefined;
+      placa?: string | undefined;
+      telefone?: string | undefined;
+      accessToken?: string | undefined;
+    }) => data,
   )
   .handler(async ({ data }) => {
     const security = await import("./client-portal.server");
@@ -389,7 +394,9 @@ export const updateTenantProfile = createServerFn({ method: "POST" })
       public_listing: data.public_listing,
     };
 
-    if (isDemoServerMode()) return demoUpdateBusinessProfile(profile);
+    if (isDemoServerMode()) {
+      return demoUpdateBusinessProfile({ ...profile, business_hours: businessHours });
+    }
 
     const { tenantId } = await requireManager(context.supabase, context.userId);
     const { data: tenant, error } = await context.supabase
@@ -486,8 +493,8 @@ export const createService = createServerFn({ method: "POST" })
     (data: {
       nome: string;
       preco: number;
-      duracao_min?: number;
-      descricao?: string;
+      duracao_min?: number | undefined;
+      descricao?: string | undefined;
       categoria: "LAVAGEM" | "ADICIONAL";
     }) => data,
   )

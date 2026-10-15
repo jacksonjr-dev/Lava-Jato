@@ -85,7 +85,7 @@ function ClientBusinessHours({
   legacyValue,
 }: {
   value: unknown;
-  legacyValue?: string | null;
+  legacyValue?: string | null | undefined;
 }) {
   const [expanded, setExpanded] = useState(false);
   const hours = normalizeBusinessHours(value);

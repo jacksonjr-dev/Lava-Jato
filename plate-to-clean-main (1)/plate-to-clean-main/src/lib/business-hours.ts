@@ -29,10 +29,10 @@ export function normalizeBusinessHours(value: unknown): BusinessHours | null {
     const raw = source[key];
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
     const entry = raw as Record<string, unknown>;
-    const open = typeof entry.open === "string" ? entry.open : "08:00";
-    const close = typeof entry.close === "string" ? entry.close : "18:00";
+    const open = typeof entry["open"] === "string" ? entry["open"] : "08:00";
+    const close = typeof entry["close"] === "string" ? entry["close"] : "18:00";
     normalized[key] = {
-      enabled: entry.enabled === true,
+      enabled: entry["enabled"] === true,
       open: TIME_PATTERN.test(open) ? open : "08:00",
       close: TIME_PATTERN.test(close) ? close : "18:00",
     };
