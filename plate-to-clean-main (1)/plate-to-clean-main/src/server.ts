@@ -49,7 +49,8 @@ function isH3SwallowedErrorBody(body: string): boolean {
 // scripts externos, frames, plugins e envio de dados para outros domínios.
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  // 'wasm-unsafe-eval': o OCR de placas (Tesseract.js) roda em WebAssembly.
+  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: blob: https:",

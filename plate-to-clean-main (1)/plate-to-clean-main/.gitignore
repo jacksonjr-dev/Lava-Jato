@@ -39,3 +39,6 @@ supabase/.temp/
 
 .vercel
 .env*
+
+# Motor de OCR copiado de node_modules (scripts/copy-ocr-assets.mjs)
+public/ocr/

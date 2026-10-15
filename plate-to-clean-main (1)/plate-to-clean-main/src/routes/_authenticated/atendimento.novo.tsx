@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { AnimatePresence, m } from "motion/react";
 import {
@@ -32,6 +32,8 @@ import {
   recognizePlate,
 } from "@/lib/lavajato.functions";
 import { brl, dateBR, normalizePlate } from "@/lib/plate";
+import { preloadPlateOcr, readPlateWithOcr } from "@/lib/plate-ocr";
+import { isDemoEnabled } from "@/lib/demo-auth";
 import { isWashService, toggleServiceSelection } from "@/lib/service-selection";
 
 export const Route = createFileRoute("/_authenticated/atendimento/novo")({
@@ -55,6 +57,12 @@ function NovoAtendimento() {
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
   const leituraPorFoto = useFeature("placa_foto");
+  const [readingPhoto, setReadingPhoto] = useState(false);
+
+  // Baixa o motor de OCR enquanto a pessoa ainda está na tela da placa.
+  useEffect(() => {
+    if (leituraPorFoto) preloadPlateOcr();
+  }, [leituraPorFoto]);
 
   const recognizeFn = useServerFn(recognizePlate);
   const findFn = useServerFn(findVehicleByPlate);
@@ -144,10 +152,26 @@ function NovoAtendimento() {
   });
 
   async function onFile(file: File) {
+    setReadingPhoto(true);
     try {
+      // 1º OCR no próprio aparelho; 2º, se configurada, a leitura por IA no servidor.
+      const ocr = await readPlateWithOcr(file);
+      if (ocr.plate) {
+        setPlate(ocr.plate);
+        setConfidence(ocr.confidence);
+        setSimulated(false);
+        return;
+      }
+      if (isDemoEnabled()) {
+        toast.error("Não encontrei uma placa válida na foto. Digite manualmente.");
+        return;
+      }
       recognizeMutation.mutate(await plateImageDataUrl(file));
-    } catch {
-      toast.error("Não foi possível abrir a foto. Digite a placa manualmente.");
+    } catch (error) {
+      console.error("[OCR]", error);
+      toast.error("Não foi possível ler a foto. Digite a placa manualmente.");
+    } finally {
+      setReadingPhoto(false);
     }
   }
 
@@ -262,10 +286,10 @@ function NovoAtendimento() {
                       type="button"
                       whileTap={{ scale: 0.97 }}
                       onClick={() => fileRef.current?.click()}
-                      disabled={recognizeMutation.isPending}
+                      disabled={readingPhoto || recognizeMutation.isPending}
                       className="flex h-20 w-full items-center justify-center gap-3 rounded-3xl border border-primary/40 bg-primary/10 text-sm font-bold text-primary transition-colors hover:bg-primary/15 disabled:opacity-60"
                     >
-                      {recognizeMutation.isPending ? (
+                      {readingPhoto || recognizeMutation.isPending ? (
                         <>
                           <Loader2 className="size-6 animate-spin" /> LENDO A PLACA…
                         </>
