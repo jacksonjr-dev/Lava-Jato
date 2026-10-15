@@ -391,6 +391,7 @@ export type Database = {
       services: {
         Row: {
           ativo: boolean;
+          categoria: string;
           created_at: string;
           descricao: string | null;
           duracao_min: number | null;
@@ -402,6 +403,7 @@ export type Database = {
         };
         Insert: {
           ativo?: boolean;
+          categoria?: string;
           created_at?: string;
           descricao?: string | null;
           duracao_min?: number | null;
@@ -413,6 +415,7 @@ export type Database = {
         };
         Update: {
           ativo?: boolean;
+          categoria?: string;
           created_at?: string;
           descricao?: string | null;
           duracao_min?: number | null;
@@ -507,6 +510,7 @@ export type Database = {
       };
       tenants: {
         Row: {
+          business_hours: Json | null;
           cor_tema: string | null;
           created_at: string;
           endereco: string | null;
@@ -523,6 +527,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          business_hours?: Json | null;
           cor_tema?: string | null;
           created_at?: string;
           endereco?: string | null;
@@ -539,6 +544,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          business_hours?: Json | null;
           cor_tema?: string | null;
           created_at?: string;
           endereco?: string | null;

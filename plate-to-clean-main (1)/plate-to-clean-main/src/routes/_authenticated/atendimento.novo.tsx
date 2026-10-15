@@ -308,7 +308,8 @@ function NovoAtendimento() {
         <div className="space-y-4">
           <p className="plate text-xl">{plate}</p>
           <p className="text-xs leading-5 text-muted-foreground">
-            Escolha uma lavagem. O polimento pode ser contratado sozinho ou junto da lavagem.
+            Escolha os serviços deste atendimento. Opções da categoria lavagem não podem ser
+            combinadas entre si.
           </p>
           {services.isLoading && (
             <p className="text-sm text-muted-foreground">Carregando serviços…</p>
@@ -328,7 +329,7 @@ function NovoAtendimento() {
                 >
                   <span className="min-w-0">
                     <span className="block font-medium">{s.nome}</span>
-                    {isWashService(s.nome) && (
+                    {isWashService(s) && (
                       <span className="mt-1 block text-[11px] text-muted-foreground">
                         Uma opção de lavagem por atendimento
                       </span>

@@ -11,7 +11,7 @@ import {
   vehicleSummary,
 } from "./lavajato.server";
 import { normalizePlate } from "./plate";
-import type { Database } from "@/integrations/supabase/types";
+import type { Database, Json } from "@/integrations/supabase/types";
 import {
   demoActiveOrders,
   demoClientPortal,
@@ -19,6 +19,7 @@ import {
   demoCreateBusiness,
   demoCreateIntake,
   demoCreateOrder,
+  demoCreateService,
   demoFinancialSummary,
   demoGetPixSettings,
   demoGetOrder,
@@ -31,6 +32,8 @@ import {
   demoSession,
   demoUpdateOrderStatus,
   demoUpdateBusinessProfile,
+  demoUpdateService,
+  demoDeactivateService,
   demoUpdatePixSettings,
   demoVehicleSummary,
   isDemoServerMode,
@@ -38,6 +41,7 @@ import {
 import { buildPixPayload } from "./pix";
 import { assertCompatibleServices } from "./service-selection";
 import { assertOrderTransition } from "./order-flow";
+import { validateBusinessHours, type BusinessHours } from "./business-hours";
 import { matchesBusinessIdentity } from "./business-identity";
 
 type OrderStatus = Database["public"]["Enums"]["order_status"];
@@ -140,6 +144,8 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
             nome: portal.tenant.nome,
             telefone: portal.tenant.telefone,
             endereco: portal.tenant.endereco,
+            horario: portal.tenant.horario,
+            business_hours: portal.tenant.business_hours,
           },
           pix: await buildPortalPix(portal.tenant, portal.orders),
           accessToken,
@@ -185,6 +191,8 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
               nome: portal.tenant.nome,
               telefone: portal.tenant.telefone,
               endereco: portal.tenant.endereco,
+              horario: portal.tenant.horario,
+              business_hours: portal.tenant.business_hours,
             },
             pix: await buildPortalPix(portal.tenant, portal.orders),
             accessToken,
@@ -237,7 +245,9 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
       await Promise.all([
         supabaseAdmin
           .from("tenants")
-          .select("id, slug, nome, telefone, endereco, pix_key, pix_receiver_name, pix_city")
+          .select(
+            "id, slug, nome, telefone, endereco, horario, business_hours, pix_key, pix_receiver_name, pix_city",
+          )
           .eq("id", vehicle.tenant_id)
           .single(),
         supabaseAdmin
@@ -264,6 +274,8 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
             nome: tenant.nome,
             telefone: tenant.telefone,
             endereco: tenant.endereco,
+            horario: tenant.horario,
+            business_hours: tenant.business_hours,
           }
         : null,
       customer: vehicle.customers,
@@ -324,7 +336,7 @@ export const updateTenantProfile = createServerFn({ method: "POST" })
       nome: string;
       telefone?: string;
       endereco?: string;
-      horario?: string;
+      business_hours: BusinessHours;
       logo_url?: string;
       public_listing: boolean;
     }) => data,
@@ -333,7 +345,7 @@ export const updateTenantProfile = createServerFn({ method: "POST" })
     const nome = data.nome.trim();
     const telefone = data.telefone?.trim() || null;
     const endereco = data.endereco?.trim() || null;
-    const horario = data.horario?.trim() || null;
+    const businessHours = validateBusinessHours(data.business_hours);
     const logoUrl = data.logo_url?.trim() || null;
 
     if (nome.length < 2 || nome.length > 80) {
@@ -344,9 +356,6 @@ export const updateTenantProfile = createServerFn({ method: "POST" })
     }
     if (endereco && endereco.length > 180) {
       throw new Error("O endereço deve ter no máximo 180 caracteres.");
-    }
-    if (horario && horario.length > 120) {
-      throw new Error("O horário deve ter no máximo 120 caracteres.");
     }
     if (logoUrl) {
       let parsedUrl: URL;
@@ -364,7 +373,7 @@ export const updateTenantProfile = createServerFn({ method: "POST" })
       nome,
       telefone,
       endereco,
-      horario,
+      business_hours: businessHours as unknown as Json,
       logo_url: logoUrl,
       public_listing: data.public_listing,
     };
@@ -463,18 +472,50 @@ export const listServices = createServerFn({ method: "GET" })
 export const createService = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator(
-    (data: { nome: string; preco: number; duracao_min?: number; descricao?: string }) => data,
+    (data: {
+      nome: string;
+      preco: number;
+      duracao_min?: number;
+      descricao?: string;
+      categoria: "LAVAGEM" | "ADICIONAL";
+    }) => data,
   )
   .handler(async ({ data, context }) => {
+    const nome = data.nome.trim();
+    const preco = Number(data.preco);
+    const duracao = data.duracao_min == null ? null : Number(data.duracao_min);
+    const descricao = data.descricao?.trim() || null;
+    if (nome.length < 2 || nome.length > 80) {
+      throw new Error("Informe um nome entre 2 e 80 caracteres.");
+    }
+    if (!Number.isFinite(preco) || preco < 0 || preco > 100_000) {
+      throw new Error("Informe um preço válido.");
+    }
+    if (duracao !== null && (!Number.isInteger(duracao) || duracao < 1 || duracao > 1440)) {
+      throw new Error("A duração deve ficar entre 1 e 1440 minutos.");
+    }
+    if (descricao && descricao.length > 240) {
+      throw new Error("A descrição deve ter no máximo 240 caracteres.");
+    }
+    if (isDemoServerMode()) {
+      return demoCreateService({
+        nome,
+        preco,
+        duracao_min: duracao,
+        descricao,
+        categoria: data.categoria,
+      });
+    }
     const { tenantId } = await requireManager(context.supabase, context.userId);
     const { data: row, error } = await context.supabase
       .from("services")
       .insert({
         tenant_id: tenantId,
-        nome: data.nome.trim(),
-        preco: Math.max(0, Number(data.preco) || 0),
-        duracao_min: data.duracao_min ?? null,
-        descricao: data.descricao?.trim() || null,
+        nome,
+        preco,
+        duracao_min: duracao,
+        descricao,
+        categoria: data.categoria,
       })
       .select("*")
       .single();
@@ -490,15 +531,39 @@ export const updateService = createServerFn({ method: "POST" })
       nome?: string;
       preco?: number;
       duracao_min?: number | null;
+      descricao?: string | null;
+      categoria?: "LAVAGEM" | "ADICIONAL";
       ativo?: boolean;
     }) => data,
   )
   .handler(async ({ data, context }) => {
+    if (data.nome !== undefined && (data.nome.trim().length < 2 || data.nome.trim().length > 80)) {
+      throw new Error("Informe um nome entre 2 e 80 caracteres.");
+    }
+    if (
+      data.preco !== undefined &&
+      (!Number.isFinite(data.preco) || data.preco < 0 || data.preco > 100_000)
+    ) {
+      throw new Error("Informe um preço válido.");
+    }
+    if (
+      data.duracao_min !== undefined &&
+      data.duracao_min !== null &&
+      (!Number.isInteger(data.duracao_min) || data.duracao_min < 1 || data.duracao_min > 1440)
+    ) {
+      throw new Error("A duração deve ficar entre 1 e 1440 minutos.");
+    }
+    if (data.descricao && data.descricao.trim().length > 240) {
+      throw new Error("A descrição deve ter no máximo 240 caracteres.");
+    }
+    if (isDemoServerMode()) return demoUpdateService(data);
     const { tenantId } = await requireManager(context.supabase, context.userId);
     const patch: Database["public"]["Tables"]["services"]["Update"] = {};
     if (data.nome !== undefined) patch.nome = data.nome.trim();
     if (data.preco !== undefined) patch.preco = Math.max(0, Number(data.preco) || 0);
     if (data.duracao_min !== undefined) patch.duracao_min = data.duracao_min;
+    if (data.descricao !== undefined) patch.descricao = data.descricao?.trim() || null;
+    if (data.categoria !== undefined) patch.categoria = data.categoria;
     if (data.ativo !== undefined) patch.ativo = data.ativo;
     const { data: row, error } = await context.supabase
       .from("services")
@@ -515,6 +580,7 @@ export const deactivateService = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: { id: string }) => data)
   .handler(async ({ data, context }) => {
+    if (isDemoServerMode()) return demoDeactivateService(data.id);
     const { tenantId } = await requireManager(context.supabase, context.userId);
     const { error } = await context.supabase
       .from("services")
@@ -712,7 +778,7 @@ export const createOrder = createServerFn({ method: "POST" })
     if (ids.length === 0) throw new Error("Selecione ao menos um serviço.");
     const { data: selectedServices, error: servicesError } = await sb
       .from("services")
-      .select("id, nome")
+      .select("id, nome, categoria")
       .eq("tenant_id", tenantId)
       .eq("ativo", true)
       .in("id", ids);
@@ -758,7 +824,7 @@ export const createNewCustomerOrder = createServerFn({ method: "POST" })
 
     const { data: selectedServices, error: servicesError } = await sb
       .from("services")
-      .select("id, nome")
+      .select("id, nome, categoria")
       .eq("tenant_id", tenantId)
       .eq("ativo", true)
       .in("id", ids);
@@ -813,7 +879,7 @@ export const addOrderItems = createServerFn({ method: "POST" })
     if (!ids.length) throw new Error("Selecione ao menos um serviço.");
     const { data: services, error: sErr } = await sb
       .from("services")
-      .select("id, nome, preco")
+      .select("id, nome, preco, categoria")
       .eq("tenant_id", tenantId)
       .eq("ativo", true)
       .in("id", ids);

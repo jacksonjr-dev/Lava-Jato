@@ -7,6 +7,7 @@ import {
   Building2,
   Car,
   Check,
+  ChevronDown,
   CircleCheckBig,
   Clock3,
   Copy,
@@ -23,6 +24,12 @@ import { brl, dateBR, normalizePlate, type OrderStatus } from "@/lib/plate";
 import { getDemoBusiness, isDemoEnabled } from "@/lib/demo-auth";
 import { WashBrand } from "@/components/app/wash-brand";
 import { WashHoseBackdrop } from "@/components/app/wash-hose-backdrop";
+import {
+  BUSINESS_DAYS,
+  formatBusinessDay,
+  normalizeBusinessHours,
+  todayBusinessDayKey,
+} from "@/lib/business-hours";
 
 export const Route = createFileRoute("/cliente")({
   ssr: false,
@@ -71,6 +78,62 @@ function tenantSearchText(value: string): string {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase("pt-BR");
+}
+
+function ClientBusinessHours({
+  value,
+  legacyValue,
+}: {
+  value: unknown;
+  legacyValue?: string | null;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const hours = normalizeBusinessHours(value);
+
+  if (!hours) {
+    return (
+      <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+        <Clock3 className="size-3.5 shrink-0 text-primary" />
+        {legacyValue || "Horários não informados"}
+      </p>
+    );
+  }
+
+  const todayKey = todayBusinessDayKey();
+  const today = BUSINESS_DAYS.find(({ key }) => key === todayKey)!;
+
+  return (
+    <div className="mt-2 max-w-sm">
+      <button
+        type="button"
+        className="group flex w-full items-center gap-2 rounded-xl py-1 text-left text-xs text-muted-foreground transition-colors hover:text-primary"
+        onClick={() => setExpanded((current) => !current)}
+        aria-expanded={expanded}
+      >
+        <Clock3 className="size-3.5 shrink-0 text-primary" />
+        <span>
+          Hoje ({today.shortLabel}) · {formatBusinessDay(hours[todayKey])}
+        </span>
+        <ChevronDown
+          className={`size-3.5 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {expanded ? (
+        <div className="mt-2 grid gap-1.5 rounded-2xl border border-border/70 bg-card/85 p-3 shadow-xl backdrop-blur sm:min-w-72">
+          {BUSINESS_DAYS.map(({ key, shortLabel }) => (
+            <div
+              key={key}
+              className={`flex items-center justify-between gap-6 text-xs ${key === todayKey ? "text-primary" : "text-muted-foreground"}`}
+            >
+              <span className="font-semibold">{shortLabel}</span>
+              <span>{formatBusinessDay(hours[key])}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function ClientPortal() {
@@ -138,6 +201,10 @@ function ClientPortal() {
               <p className="mt-1 text-xs text-muted-foreground">
                 {displayedTenant?.endereco ?? "Endereço não informado"}
               </p>
+              <ClientBusinessHours
+                value={data.tenant?.business_hours}
+                legacyValue={data.tenant?.horario}
+              />
             </div>
             <button
               type="button"

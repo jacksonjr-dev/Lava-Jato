@@ -82,4 +82,16 @@ describe("migrações de integridade", () => {
     expect(migration).toContain("app.current_role_in_tenant()");
     expect(migration).not.toContain("public.current_role()");
   });
+
+  it("mantém catálogo e categorias de serviço separados por empresa", () => {
+    const migration = readFileSync(
+      resolve("supabase/migrations/20261014130000_multitenant_service_catalog.sql"),
+      "utf8",
+    );
+    expect(migration).toContain("ADD COLUMN IF NOT EXISTS categoria");
+    expect(migration).toContain("service.tenant_id = item.tenant_id");
+    expect(migration).toContain("item.tenant_id = NEW.tenant_id");
+    expect(migration).toContain("'LAVAGEM'");
+    expect(migration).toContain("'ADICIONAL'");
+  });
 });

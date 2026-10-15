@@ -17,6 +17,7 @@ import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authentic
 import { Route as AuthenticatedHomeRouteImport } from './routes/_authenticated/home'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedPerfilRouteImport } from './routes/_authenticated/perfil'
+import { Route as AuthenticatedServicosRouteImport } from './routes/_authenticated/servicos'
 import { Route as AuthenticatedVeiculosRouteImport } from './routes/_authenticated/veiculos'
 import { Route as AuthenticatedAtendimentoNovoRouteImport } from './routes/_authenticated/atendimento.novo'
 import { Route as AuthenticatedOsIdRouteImport } from './routes/_authenticated/os.$id'
@@ -60,6 +61,11 @@ const AuthenticatedPerfilRoute = AuthenticatedPerfilRouteImport.update({
   path: '/perfil',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedServicosRoute = AuthenticatedServicosRouteImport.update({
+  id: '/servicos',
+  path: '/servicos',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedVeiculosRoute = AuthenticatedVeiculosRouteImport.update({
   id: '/veiculos',
   path: '/veiculos',
@@ -85,6 +91,7 @@ export interface FileRoutesByFullPath {
   '/home': typeof AuthenticatedHomeRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/perfil': typeof AuthenticatedPerfilRoute
+  '/servicos': typeof AuthenticatedServicosRoute
   '/veiculos': typeof AuthenticatedVeiculosRoute
   '/atendimento/novo': typeof AuthenticatedAtendimentoNovoRoute
   '/os/$id': typeof AuthenticatedOsIdRoute
@@ -97,6 +104,7 @@ export interface FileRoutesByTo {
   '/home': typeof AuthenticatedHomeRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/perfil': typeof AuthenticatedPerfilRoute
+  '/servicos': typeof AuthenticatedServicosRoute
   '/veiculos': typeof AuthenticatedVeiculosRoute
   '/atendimento/novo': typeof AuthenticatedAtendimentoNovoRoute
   '/os/$id': typeof AuthenticatedOsIdRoute
@@ -111,6 +119,7 @@ export interface FileRoutesById {
   '/_authenticated/home': typeof AuthenticatedHomeRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/perfil': typeof AuthenticatedPerfilRoute
+  '/_authenticated/servicos': typeof AuthenticatedServicosRoute
   '/_authenticated/veiculos': typeof AuthenticatedVeiculosRoute
   '/_authenticated/atendimento/novo': typeof AuthenticatedAtendimentoNovoRoute
   '/_authenticated/os/$id': typeof AuthenticatedOsIdRoute
@@ -125,6 +134,7 @@ export interface FileRouteTypes {
     | '/home'
     | '/onboarding'
     | '/perfil'
+    | '/servicos'
     | '/veiculos'
     | '/atendimento/novo'
     | '/os/$id'
@@ -137,6 +147,7 @@ export interface FileRouteTypes {
     | '/home'
     | '/onboarding'
     | '/perfil'
+    | '/servicos'
     | '/veiculos'
     | '/atendimento/novo'
     | '/os/$id'
@@ -150,6 +161,7 @@ export interface FileRouteTypes {
     | '/_authenticated/home'
     | '/_authenticated/onboarding'
     | '/_authenticated/perfil'
+    | '/_authenticated/servicos'
     | '/_authenticated/veiculos'
     | '/_authenticated/atendimento/novo'
     | '/_authenticated/os/$id'
@@ -220,6 +232,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPerfilRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/servicos': {
+      id: '/_authenticated/servicos'
+      path: '/servicos'
+      fullPath: '/servicos'
+      preLoaderRoute: typeof AuthenticatedServicosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/veiculos': {
       id: '/_authenticated/veiculos'
       path: '/veiculos'
@@ -249,6 +268,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedHomeRoute: typeof AuthenticatedHomeRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedPerfilRoute: typeof AuthenticatedPerfilRoute
+  AuthenticatedServicosRoute: typeof AuthenticatedServicosRoute
   AuthenticatedVeiculosRoute: typeof AuthenticatedVeiculosRoute
   AuthenticatedAtendimentoNovoRoute: typeof AuthenticatedAtendimentoNovoRoute
   AuthenticatedOsIdRoute: typeof AuthenticatedOsIdRoute
@@ -259,6 +279,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedHomeRoute: AuthenticatedHomeRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedPerfilRoute: AuthenticatedPerfilRoute,
+  AuthenticatedServicosRoute: AuthenticatedServicosRoute,
   AuthenticatedVeiculosRoute: AuthenticatedVeiculosRoute,
   AuthenticatedAtendimentoNovoRoute: AuthenticatedAtendimentoNovoRoute,
   AuthenticatedOsIdRoute: AuthenticatedOsIdRoute,

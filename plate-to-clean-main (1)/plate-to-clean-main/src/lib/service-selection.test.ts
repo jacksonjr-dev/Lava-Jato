@@ -6,16 +6,19 @@ import {
 } from "./service-selection";
 
 const services = [
-  { id: "simple", nome: "Lavagem simples (apenas externa)" },
-  { id: "complete", nome: "Lavagem completa (externa e interna)" },
-  { id: "polish", nome: "Polimento" },
+  { id: "simple", nome: "Lavagem simples (apenas externa)", categoria: "LAVAGEM" },
+  { id: "complete", nome: "Lavagem completa (externa e interna)", categoria: "LAVAGEM" },
+  { id: "polish", nome: "Polimento", categoria: "ADICIONAL" },
 ];
 
 describe("seleção de serviços", () => {
   it("reconhece os dois tipos de lavagem", () => {
-    expect(isWashService(services[0]!.nome)).toBe(true);
-    expect(isWashService(services[1]!.nome)).toBe(true);
-    expect(isWashService(services[2]!.nome)).toBe(false);
+    expect(isWashService(services[0]!)).toBe(true);
+    expect(isWashService(services[1]!)).toBe(true);
+    expect(isWashService(services[2]!)).toBe(false);
+    expect(isWashService({ id: "eco", nome: "Limpeza ecológica", categoria: "LAVAGEM" })).toBe(
+      true,
+    );
   });
 
   it("troca a lavagem simples pela completa e mantém o polimento", () => {

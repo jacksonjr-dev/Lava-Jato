@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Building2, Car, House, LogOut, Menu, WalletCards } from "lucide-react";
+import { ArrowLeft, Building2, Car, House, LogOut, Menu, WalletCards, Wrench } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -108,6 +108,15 @@ export function AppShell({
                     Perfil do lava-jato
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  asChild
+                  className="rounded-xl px-3 py-3 focus:bg-primary/10 focus:text-primary"
+                >
+                  <Link to="/servicos">
+                    <Wrench />
+                    Catálogo de serviços
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="rounded-xl px-3 py-3 text-destructive focus:bg-destructive/10 focus:text-destructive"
@@ -133,8 +142,9 @@ export function AppShell({
       </main>
       {!back && (
         <nav className="sticky bottom-0 z-20 border-t border-border bg-background/95 px-3 pt-2 pb-[calc(env(safe-area-inset-bottom,0px)+0.5rem)] backdrop-blur">
-          <div className="mx-auto grid max-w-3xl grid-cols-3 gap-1">
+          <div className="mx-auto grid max-w-3xl grid-cols-4 gap-1">
             <NavItem to="/home" icon={<House className="size-4" />} label="Operação" />
+            <NavItem to="/servicos" icon={<Wrench className="size-4" />} label="Serviços" />
             <NavItem
               to="/financeiro"
               icon={<WalletCards className="size-4" />}

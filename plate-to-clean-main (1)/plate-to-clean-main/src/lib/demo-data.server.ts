@@ -5,6 +5,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { assertOrderTransition } from "./order-flow";
 import { calculateFinancialStats, financialPeriod } from "./financial";
 import { assertCompatibleServices } from "./service-selection";
+import type { BusinessHours } from "./business-hours";
 
 type OrderStatus = Database["public"]["Enums"]["order_status"];
 type PaymentMethod = Database["public"]["Enums"]["payment_method"];
@@ -77,6 +78,7 @@ export const demoPublicTenants = [
 ] as const;
 const now = () => new Date().toISOString();
 type DemoBusinessSettings = {
+  business_hours: BusinessHours | null;
   id: string;
   slug: string;
   nome: string;
@@ -98,6 +100,7 @@ const defaultPixSettings: DemoPixSettings = {
   pix_city: "Fortaleza",
 };
 const defaultBusinessSettings: DemoBusinessSettings = {
+  business_hours: null,
   id: tenantId,
   slug: "lavapro-demonstracao",
   nome: "LavaPro Demonstração",
@@ -187,11 +190,12 @@ export function isDemoServerMode(): boolean {
   );
 }
 
-export const demoServices = [
+export let demoServices = [
   {
     id: "svc-1",
     tenant_id: tenantId,
     nome: "Lavagem simples (apenas externa)",
+    categoria: "LAVAGEM",
     preco: 35,
     duracao_min: 30,
     descricao: "Lavagem apenas da parte externa e secagem",
@@ -203,6 +207,7 @@ export const demoServices = [
     id: "svc-2",
     tenant_id: tenantId,
     nome: "Lavagem completa (externa e interna)",
+    categoria: "LAVAGEM",
     preco: 60,
     duracao_min: 60,
     descricao: "Lavagem externa e limpeza da parte interna",
@@ -214,6 +219,7 @@ export const demoServices = [
     id: "svc-4",
     tenant_id: tenantId,
     nome: "Polimento",
+    categoria: "ADICIONAL",
     preco: 150,
     duracao_min: 180,
     descricao: "Polimento técnico da pintura",
@@ -222,6 +228,48 @@ export const demoServices = [
     updated_at: now(),
   },
 ];
+
+type DemoService = (typeof demoServices)[number];
+
+export function demoCreateService(data: {
+  nome: string;
+  preco: number;
+  duracao_min: number | null;
+  descricao: string | null;
+  categoria: "LAVAGEM" | "ADICIONAL";
+}) {
+  const service: DemoService = {
+    id: `svc-${Date.now()}`,
+    tenant_id: tenantId,
+    nome: data.nome,
+    preco: data.preco,
+    duracao_min: data.duracao_min,
+    descricao: data.descricao,
+    categoria: data.categoria,
+    ativo: true,
+    created_at: now(),
+    updated_at: now(),
+  };
+  demoServices = [...demoServices, service];
+  return service;
+}
+
+export function demoUpdateService(
+  data: { id: string } & Partial<
+    Pick<DemoService, "nome" | "preco" | "duracao_min" | "descricao" | "categoria" | "ativo">
+  >,
+) {
+  const current = demoServices.find((service) => service.id === data.id);
+  if (!current) throw new Error("Serviço não encontrado.");
+  const updated = { ...current, ...data, updated_at: now() } as DemoService;
+  demoServices = demoServices.map((service) => (service.id === data.id ? updated : service));
+  return updated;
+}
+
+export function demoDeactivateService(id: string) {
+  demoUpdateService({ id, ativo: false });
+  return { ok: true };
+}
 
 const vehicles = new Map<string, DemoVehicle>([
   [
@@ -667,6 +715,7 @@ export function demoCreateBusiness(data: {
   const nome = data.nome?.trim();
   if (!nome || nome.length < 2) throw new Error("Informe o nome do lava-jato.");
   businessSettings = {
+    business_hours: null,
     id: tenantId,
     slug: businessSlug(nome),
     nome,
@@ -681,10 +730,10 @@ export function demoCreateBusiness(data: {
 }
 
 export function demoUpdateBusinessProfile(data: {
+  business_hours: BusinessHours;
   nome: string;
   telefone: string | null;
   endereco: string | null;
-  horario: string | null;
   logo_url: string | null;
   public_listing: boolean;
 }) {

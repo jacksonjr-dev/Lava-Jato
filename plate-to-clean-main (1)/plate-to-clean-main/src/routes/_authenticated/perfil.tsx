@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import {
   Building2,
   CheckCircle2,
+  Clock3,
   Eye,
   EyeOff,
   Loader2,
@@ -21,6 +22,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { getSession, updateTenantProfile } from "@/lib/lavajato.functions";
+import {
+  BUSINESS_DAYS,
+  emptyBusinessHours,
+  normalizeBusinessHours,
+  type BusinessDayKey,
+  type BusinessHours,
+} from "@/lib/business-hours";
 
 export const Route = createFileRoute("/_authenticated/perfil")({
   head: () => ({
@@ -44,7 +52,7 @@ function BusinessProfile() {
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
   const [endereco, setEndereco] = useState("");
-  const [horario, setHorario] = useState("");
+  const [businessHours, setBusinessHours] = useState<BusinessHours>(() => emptyBusinessHours());
   const [logoUrl, setLogoUrl] = useState("");
   const [publicListing, setPublicListing] = useState(true);
 
@@ -53,7 +61,7 @@ function BusinessProfile() {
     setNome(tenant.nome);
     setTelefone(tenant.telefone ?? "");
     setEndereco(tenant.endereco ?? "");
-    setHorario(tenant.horario ?? "");
+    setBusinessHours(normalizeBusinessHours(tenant.business_hours) ?? emptyBusinessHours());
     setLogoUrl(tenant.logo_url ?? "");
     setPublicListing(tenant.public_listing);
   }, [tenant]);
@@ -65,7 +73,7 @@ function BusinessProfile() {
           nome,
           telefone,
           endereco,
-          horario,
+          business_hours: businessHours,
           logo_url: logoUrl,
           public_listing: publicListing,
         },
@@ -82,6 +90,14 @@ function BusinessProfile() {
   const createdAt = tenant?.created_at
     ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(new Date(tenant.created_at))
     : null;
+  const configuredDays = BUSINESS_DAYS.filter(({ key }) => businessHours[key].enabled).length;
+
+  function updateBusinessDay(key: BusinessDayKey, patch: Partial<BusinessHours[BusinessDayKey]>) {
+    setBusinessHours((current) => ({
+      ...current,
+      [key]: { ...current[key], ...patch },
+    }));
+  }
 
   return (
     <AppShell title="Perfil do lava-jato" back="/home">
@@ -108,6 +124,14 @@ function BusinessProfile() {
                 <div className="mt-5 space-y-3 text-sm">
                   <ProfileLine icon={<Phone />} value={telefone || "Telefone não informado"} />
                   <ProfileLine icon={<MapPin />} value={endereco || "Endereço não informado"} />
+                  <ProfileLine
+                    icon={<Clock3 />}
+                    value={
+                      configuredDays > 0
+                        ? `${configuredDays} ${configuredDays === 1 ? "dia configurado" : "dias configurados"}`
+                        : "Horários não informados"
+                    }
+                  />
                   <ProfileLine icon={<Building2 />} value={roleLabel} />
                 </div>
               </div>
@@ -162,15 +186,6 @@ function BusinessProfile() {
                   placeholder="(85) 99999-9999"
                 />
               </Field>
-              <Field label="Horário de funcionamento" htmlFor="profile-hours">
-                <Input
-                  id="profile-hours"
-                  value={horario}
-                  onChange={(e) => setHorario(e.target.value)}
-                  maxLength={120}
-                  placeholder="Segunda a sábado, 08h às 18h"
-                />
-              </Field>
               <Field className="sm:col-span-2" label="Endereço" htmlFor="profile-address">
                 <Input
                   id="profile-address"
@@ -190,6 +205,81 @@ function BusinessProfile() {
                 />
               </Field>
             </div>
+
+            <section
+              className="mt-6 border-t border-border pt-6"
+              aria-labelledby="business-hours-title"
+            >
+              <div className="flex items-start gap-3">
+                <Clock3 className="mt-0.5 size-5 shrink-0 text-primary" />
+                <div>
+                  <h3 id="business-hours-title" className="font-bold">
+                    Horários de funcionamento
+                  </h3>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    Ative os dias em que o lava-jato funciona e informe abertura e fechamento.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 overflow-hidden rounded-2xl border border-border bg-background/40">
+                {BUSINESS_DAYS.map(({ key, label }) => {
+                  const day = businessHours[key];
+                  return (
+                    <div
+                      key={key}
+                      className="grid gap-3 border-b border-border/70 p-4 last:border-b-0 sm:grid-cols-[150px_1fr] sm:items-center"
+                    >
+                      <div className="flex items-center justify-between gap-3 sm:justify-start">
+                        <Switch
+                          id={`business-hours-${key}`}
+                          checked={day.enabled}
+                          onCheckedChange={(enabled) => updateBusinessDay(key, { enabled })}
+                          aria-label={`${day.enabled ? "Fechar" : "Abrir"} ${label}`}
+                        />
+                        <Label htmlFor={`business-hours-${key}`} className="min-w-28 sm:min-w-0">
+                          {label}
+                        </Label>
+                      </div>
+
+                      {day.enabled ? (
+                        <div className="flex items-center gap-2 sm:justify-end">
+                          <Label className="sr-only" htmlFor={`business-hours-${key}-open`}>
+                            Abertura de {label}
+                          </Label>
+                          <Input
+                            id={`business-hours-${key}-open`}
+                            type="time"
+                            value={day.open}
+                            onChange={(event) =>
+                              updateBusinessDay(key, { open: event.target.value })
+                            }
+                            className="min-w-0 flex-1 sm:max-w-32"
+                            required
+                          />
+                          <span className="text-xs text-muted-foreground">às</span>
+                          <Label className="sr-only" htmlFor={`business-hours-${key}-close`}>
+                            Fechamento de {label}
+                          </Label>
+                          <Input
+                            id={`business-hours-${key}-close`}
+                            type="time"
+                            value={day.close}
+                            onChange={(event) =>
+                              updateBusinessDay(key, { close: event.target.value })
+                            }
+                            className="min-w-0 flex-1 sm:max-w-32"
+                            required
+                          />
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground sm:text-right">Fechado</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
 
             <div className="mt-6 flex items-start justify-between gap-4 rounded-2xl border border-border bg-background/55 p-4">
               <div className="flex gap-3">
