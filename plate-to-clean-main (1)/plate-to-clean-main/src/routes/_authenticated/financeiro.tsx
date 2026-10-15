@@ -22,6 +22,8 @@ import { AppShell } from "@/components/app/shell";
 import { UpgradeNotice } from "@/components/app/plan-gate";
 import { useFeature } from "@/hooks/use-plan";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { CountUp } from "@/components/app/motion";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { financialSummary, getPixSettings, updatePixSettings } from "@/lib/lavajato.functions";
@@ -139,7 +141,13 @@ function FinancialPage() {
         </div>
 
         {query.isLoading && (
-          <p className="py-10 text-sm text-muted-foreground">Carregando dados financeiros…</p>
+          <div className="mt-6 space-y-6" aria-label="Carregando dados financeiros">
+            <Skeleton className="h-36 rounded-2xl" />
+            <div className="grid gap-6 lg:grid-cols-[1.4fr_0.6fr]">
+              <Skeleton className="h-72 rounded-2xl" />
+              <Skeleton className="h-72 rounded-2xl" />
+            </div>
+          </div>
         )}
         {query.isError && (
           <p className="my-8 rounded-2xl border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
@@ -149,29 +157,29 @@ function FinancialPage() {
 
         {data && (
           <>
-            <section className="reveal-stagger mt-6 grid overflow-hidden border border-border bg-card sm:grid-cols-2 lg:grid-cols-4">
+            <section className="reveal-stagger mt-6 grid overflow-hidden rounded-2xl border border-border bg-card sm:grid-cols-2 lg:grid-cols-4">
               <FinancialMetric
                 icon={<Banknote className="size-5" />}
                 label="HOJE"
-                value={brl(data.faturamentoDia)}
+                value={Number(data.faturamentoDia)}
                 trend="Caixa recebido"
               />
               <FinancialMetric
                 icon={<WalletCards className="size-5" />}
                 label="ÚLTIMOS 7 DIAS"
-                value={brl(data.faturamentoSemana)}
+                value={Number(data.faturamentoSemana)}
                 trend={`${data.veiculosDia} veículos hoje`}
               />
               <FinancialMetric
                 icon={<ReceiptText className="size-5" />}
                 label="MÊS ATUAL"
-                value={brl(data.faturamentoMes)}
+                value={Number(data.faturamentoMes)}
                 trend={`${data.pagosOuEntregues} pagamentos recebidos no mês`}
               />
               <FinancialMetric
                 icon={<Car className="size-5" />}
                 label="TICKET MÉDIO"
-                value={brl(data.ticketMedio)}
+                value={Number(data.ticketMedio)}
                 trend={`${data.veiculosMes} veículos no mês`}
               />
             </section>
@@ -246,7 +254,7 @@ function FinancialPage() {
                 </div>
               </div>
 
-              <div className="grid overflow-hidden border border-border bg-card sm:grid-cols-2">
+              <div className="grid overflow-hidden rounded-2xl border border-border bg-card sm:grid-cols-2">
                 <OperationalNumber
                   label="EM ANDAMENTO"
                   value={String(data.emAndamento)}
@@ -406,7 +414,7 @@ function FinancialMetric({
 }: {
   icon: React.ReactNode;
   label: string;
-  value: string;
+  value: number;
   trend: string;
 }) {
   return (
@@ -415,7 +423,9 @@ function FinancialMetric({
         {icon}
         <span className="text-[10px]">{label}</span>
       </div>
-      <p className="mt-6 text-2xl font-bold tabular-nums md:text-3xl">{value}</p>
+      <p className="mt-6 text-2xl font-bold tabular-nums md:text-3xl">
+        <CountUp value={value} format={brl} />
+      </p>
       <p className="mt-2 text-[11px] text-muted-foreground">{trend}</p>
     </div>
   );

@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Search } from "lucide-react";
 import { AppShell } from "@/components/app/shell";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import {
   adminListTenants,
@@ -93,7 +94,13 @@ function AdminPage() {
         </div>
       </div>
 
-      {query.isLoading && <p className="py-10 text-sm text-muted-foreground">Carregando…</p>}
+      {query.isLoading && (
+        <div className="mt-6 grid gap-3" aria-label="Carregando empresas">
+          {[0, 1, 2].map((item) => (
+            <Skeleton key={item} className="h-36 rounded-2xl" />
+          ))}
+        </div>
+      )}
       {query.isError && (
         <p className="my-8 border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
           {(query.error as Error).message}

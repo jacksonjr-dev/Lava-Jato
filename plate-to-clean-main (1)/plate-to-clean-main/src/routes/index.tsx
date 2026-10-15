@@ -21,6 +21,8 @@ import {
 import { WashBrand } from "@/components/app/wash-brand";
 import { WashHoseBackdrop } from "@/components/app/wash-hose-backdrop";
 import { PLAN_IDS, PLANS, TRIAL_DAYS } from "@/lib/plans";
+import { m } from "motion/react";
+import { Stagger, StaggerItem } from "@/components/app/motion";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -157,7 +159,11 @@ function Hero() {
   return (
     <section id="inicio" className="mx-auto max-w-6xl scroll-mt-24 px-5 pb-12 pt-12 md:pt-20">
       <div className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
-        <div>
+        <m.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 200, damping: 26 }}
+        >
           <p className="text-xs font-semibold text-primary">SISTEMA DE GESTÃO PARA LAVA-JATO</p>
           <h1 className="mt-4 text-[clamp(2.5rem,9vw,5rem)] font-bold leading-[0.95] tracking-[-0.06em]">
             Do pátio até a entrega, sem papel e sem planilha.
@@ -170,7 +176,7 @@ function Hero() {
             <Link
               to="/auth"
               search={{ modo: "cadastro" }}
-              className="group inline-flex h-14 items-center justify-between gap-6 border border-primary bg-brand px-5 text-sm font-bold text-primary-foreground shadow-glow"
+              className="group inline-flex h-14 items-center justify-between gap-6 border border-primary bg-brand px-5 text-sm font-bold text-primary-foreground shadow-glow transition-transform hover:-translate-y-0.5 active:scale-95"
             >
               COMEÇAR AGORA
               <ArrowRight className="size-5 transition-transform group-hover:translate-x-1" />
@@ -182,8 +188,19 @@ function Hero() {
               VER COMO FUNCIONA
             </a>
           </div>
-        </div>
-        <OrderMockup />
+        </m.div>
+        <m.div
+          initial={{ opacity: 0, y: 40, rotate: 2 }}
+          animate={{ opacity: 1, y: 0, rotate: 0 }}
+          transition={{ type: "spring", stiffness: 140, damping: 20, delay: 0.15 }}
+        >
+          <m.div
+            animate={{ y: [0, -10, 0] }}
+            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <OrderMockup />
+          </m.div>
+        </m.div>
       </div>
 
       <dl className="reveal-stagger mt-12 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -270,7 +287,7 @@ function Audiences() {
         eyebrow="UM SISTEMA, DOIS LADOS"
         title="Feito para quem lava e para quem é atendido."
       />
-      <div className="reveal-stagger mt-8 grid gap-6 md:grid-cols-2">
+      <Stagger className="mt-8 grid gap-6 md:grid-cols-2">
         <AudienceCard
           icon={<Store className="size-8" strokeWidth={1.5} />}
           eyebrow="PROPRIETÁRIO"
@@ -312,7 +329,7 @@ function Audiences() {
             </Link>
           }
         />
-      </div>
+      </Stagger>
     </section>
   );
 }
@@ -331,7 +348,10 @@ function AudienceCard({
   action: ReactNode;
 }) {
   return (
-    <article className="interactive-panel flex flex-col border border-border bg-card p-6 md:p-9">
+    <StaggerItem
+      as="article"
+      className="interactive-panel flex flex-col border border-border bg-card p-6 md:p-9"
+    >
       <span className="text-primary">{icon}</span>
       <p className="mt-8 text-xs font-semibold text-primary">{eyebrow}</p>
       <h3 className="mt-3 text-3xl font-bold tracking-[-0.055em] md:text-4xl">{title}</h3>
@@ -344,7 +364,7 @@ function AudienceCard({
         ))}
       </ul>
       <div className="mt-auto">{action}</div>
-    </article>
+    </StaggerItem>
   );
 }
 
@@ -399,10 +419,11 @@ function Features() {
         title="Tudo o que o lava-jato precisa no dia a dia."
         description="Pensado para o ritmo do pátio: poucos toques, letras grandes e funcionando no celular."
       />
-      <div className="reveal-stagger mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <Stagger className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {FEATURES.map((feature) => (
-          <article
+          <StaggerItem
             key={feature.title}
+            as="article"
             className="interactive-panel border border-border bg-card p-5"
           >
             <span className="inline-flex size-10 items-center justify-center border border-primary/40 text-primary">
@@ -410,9 +431,9 @@ function Features() {
             </span>
             <h3 className="mt-5 text-sm font-bold">{feature.title}</h3>
             <p className="mt-2 text-xs leading-5 text-muted-foreground">{feature.text}</p>
-          </article>
+          </StaggerItem>
         ))}
-      </div>
+      </Stagger>
     </section>
   );
 }
@@ -440,17 +461,17 @@ function HowItWorks() {
   return (
     <section id="como-funciona" className="mx-auto max-w-6xl scroll-mt-24 px-5 py-12">
       <SectionTitle eyebrow="COMO FUNCIONA" title="Quatro passos, do pátio ao caixa." />
-      <ol className="reveal-stagger mt-8 grid gap-3 md:grid-cols-4">
+      <Stagger as="ol" className="mt-8 grid gap-3 md:grid-cols-4">
         {STEPS.map((step, index) => (
-          <li key={step.title} className="border border-border bg-card p-5">
+          <StaggerItem key={step.title} as="li" className="border border-border bg-card p-5">
             <span className="text-xs tabular-nums text-primary">
               {String(index + 1).padStart(2, "0")}
             </span>
             <h3 className="mt-6 text-lg font-bold tracking-[-0.03em]">{step.title}</h3>
             <p className="mt-2 text-xs leading-5 text-muted-foreground">{step.text}</p>
-          </li>
+          </StaggerItem>
         ))}
-      </ol>
+      </Stagger>
     </section>
   );
 }
@@ -494,7 +515,14 @@ function ClientArea() {
 
 function PhoneMockup() {
   return (
-    <div className="mx-auto w-full max-w-[280px] border-[6px] border-secondary bg-background p-4 shadow-glow">
+    <m.div
+      initial={{ opacity: 0 }}
+      whileInView={{ opacity: 1 }}
+      viewport={{ once: true }}
+      animate={{ y: [0, -8, 0] }}
+      transition={{ y: { duration: 5, repeat: Infinity, ease: "easeInOut" } }}
+      className="mx-auto w-full max-w-[280px] border-[6px] border-secondary bg-background p-4 shadow-glow"
+    >
       <p className="text-[10px] text-muted-foreground">Olá, Carlos</p>
       <p className="plate mt-2 text-xl font-bold tracking-[0.1em]">ABC1D23</p>
       <div className="mt-4 border border-primary/40 bg-primary/10 p-3">
@@ -513,7 +541,7 @@ function PhoneMockup() {
         <MockRow label="12/10 · Lavagem completa" value="R$ 60" />
         <MockRow label="28/09 · Polimento" value="R$ 150" />
       </div>
-    </div>
+    </m.div>
   );
 }
 
@@ -533,8 +561,18 @@ function Finance() {
           </div>
           <div className="mt-6 flex h-36 items-end gap-2" aria-hidden="true">
             {bars.map((height, index) => (
-              <div key={index} className="flex flex-1 flex-col items-center gap-2">
-                <span className="w-full bg-primary/80" style={{ height: `${height}%` }} />
+              <div
+                key={index}
+                className="flex h-full flex-1 flex-col items-center justify-end gap-2"
+              >
+                <m.span
+                  className="w-full origin-bottom bg-primary/80"
+                  style={{ height: `${height}%` }}
+                  initial={{ scaleY: 0 }}
+                  whileInView={{ scaleY: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ type: "spring", stiffness: 160, damping: 18, delay: index * 0.06 }}
+                />
                 <span className="text-[9px] text-muted-foreground">{days[index]}</span>
               </div>
             ))}
@@ -598,10 +636,11 @@ function Plans() {
         title="Escolha o plano do tamanho do seu pátio."
         description={`Comece com ${TRIAL_DAYS} dias grátis do plano Max. Depois, escolha o seu plano ou continue no Grátis, sem perder seus dados.`}
       />
-      <div className="reveal-stagger mt-8 grid gap-6 lg:grid-cols-3">
+      <Stagger className="mt-8 grid gap-6 lg:grid-cols-3">
         {PLAN_IDS.map((id) => PLANS[id]).map((plan) => (
-          <article
+          <StaggerItem
             key={plan.nome}
+            as="article"
             className={`relative flex flex-col border bg-card p-6 md:p-8 ${
               plan.destaque ? "border-primary shadow-glow" : "border-border"
             }`}
@@ -638,9 +677,9 @@ function Plans() {
             >
               COMEÇAR COM O {plan.nome.toUpperCase()}
             </Link>
-          </article>
+          </StaggerItem>
         ))}
-      </div>
+      </Stagger>
     </section>
   );
 }
@@ -809,12 +848,17 @@ function SectionTitle({
   description?: string;
 }) {
   return (
-    <div className="max-w-2xl">
+    <m.div
+      className="max-w-2xl"
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "0px 0px -10% 0px" }}
+    >
       <p className="text-xs font-semibold text-primary">{eyebrow}</p>
       <h2 className="mt-3 text-[clamp(1.75rem,4.5vw,2.75rem)] font-bold leading-tight tracking-[-0.05em]">
         {title}
       </h2>
       {description && <p className="mt-4 text-sm leading-6 text-muted-foreground">{description}</p>}
-    </div>
+    </m.div>
   );
 }

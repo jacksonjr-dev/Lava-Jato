@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { Clock3, Loader2, Pencil, Plus, Power, PowerOff, Wrench } from "lucide-react";
+import { AnimatePresence, m } from "motion/react";
+import { ChevronDown, Clock3, Loader2, Pencil, Plus, Power, PowerOff, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/shell";
 import { Button } from "@/components/ui/button";
@@ -79,6 +80,7 @@ function ServicesCatalog() {
   const updateFn = useServerFn(updateService);
   const deactivateFn = useServerFn(deactivateService);
   const [draft, setDraft] = useState<ServiceDraft>(emptyDraft);
+  const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ServiceRow | null>(null);
   const [editDraft, setEditDraft] = useState<ServiceDraft>(emptyDraft);
 
@@ -158,49 +160,70 @@ function ServicesCatalog() {
   }
 
   return (
-    <AppShell title="Catálogo de serviços" back="/home" wide>
+    <AppShell title="Serviços" wide>
       <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
         <section className="interactive-panel h-fit border border-primary/35 bg-card p-5 md:p-7">
-          <div className="flex items-start gap-3 border-b border-border pb-5">
+          {/* No celular o formulário começa recolhido para a lista aparecer logo. */}
+          <button
+            type="button"
+            onClick={() => setFormOpen((open) => !open)}
+            aria-expanded={formOpen}
+            className="flex w-full items-start gap-3 text-left lg:pointer-events-none lg:border-b lg:border-border lg:pb-5"
+          >
             <div className="rounded-2xl border border-primary/30 bg-primary/10 p-3 text-primary">
-              <Plus className="size-5" />
+              <Plus
+                className={`size-5 transition-transform duration-300 ${formOpen ? "rotate-45 lg:rotate-0" : ""}`}
+              />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <h2 className="text-lg font-bold">Adicionar serviço</h2>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
                 Este serviço ficará disponível somente para este lava-jato.
               </p>
             </div>
-          </div>
+            <ChevronDown
+              className={`mt-3 size-5 shrink-0 text-muted-foreground transition-transform duration-300 lg:hidden ${formOpen ? "rotate-180" : ""}`}
+            />
+          </button>
 
-          {canManage ? (
-            <form
-              className="mt-5 space-y-4"
-              onSubmit={(event) => {
-                event.preventDefault();
-                createMutation.mutate();
-              }}
-            >
-              <ServiceFields draft={draft} onChange={setDraft} prefix="new-service" />
-              <Button
-                type="submit"
-                className="h-13 w-full rounded-2xl"
-                disabled={createMutation.isPending}
-              >
-                {createMutation.isPending ? (
-                  <Loader2 className="size-5 animate-spin" />
-                ) : (
-                  <>
-                    <Plus className="size-5" /> Adicionar ao catálogo
-                  </>
-                )}
-              </Button>
-            </form>
-          ) : (
-            <p className="mt-5 text-sm text-muted-foreground">
-              Apenas proprietários e gerentes podem alterar o catálogo.
-            </p>
-          )}
+          {/* No desktop o formulário fica sempre aberto (as classes lg:! vencem o estilo inline). */}
+          <m.div
+            initial={false}
+            animate={formOpen ? { height: "auto", opacity: 1 } : { height: 0, opacity: 0 }}
+            transition={{ duration: 0.32, ease: [0.2, 0.75, 0.25, 1] }}
+            className="overflow-hidden lg:!h-auto lg:!overflow-visible lg:!opacity-100"
+          >
+            <div className="mt-5 border-t border-border pt-5 lg:border-0 lg:pt-0">
+              {canManage ? (
+                <form
+                  className="space-y-4"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    createMutation.mutate();
+                  }}
+                >
+                  <ServiceFields draft={draft} onChange={setDraft} prefix="new-service" />
+                  <Button
+                    type="submit"
+                    className="h-13 w-full rounded-2xl"
+                    disabled={createMutation.isPending}
+                  >
+                    {createMutation.isPending ? (
+                      <Loader2 className="size-5 animate-spin" />
+                    ) : (
+                      <>
+                        <Plus className="size-5" /> Adicionar ao catálogo
+                      </>
+                    )}
+                  </Button>
+                </form>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Apenas proprietários e gerentes podem alterar o catálogo.
+                </p>
+              )}
+            </div>
+          </m.div>
         </section>
 
         <section className="interactive-panel border border-border bg-card p-5 md:p-7">
@@ -219,76 +242,88 @@ function ServicesCatalog() {
               <Loader2 className="size-6 animate-spin" aria-label="Carregando serviços" />
             </div>
           ) : rows.length ? (
-            <div className="reveal-stagger mt-5 space-y-3">
-              {rows.map((service) => (
-                <article
-                  key={service.id}
-                  className={`rounded-2xl border p-4 transition-colors ${
-                    service.ativo
-                      ? "border-border bg-background/45 hover:border-primary/40"
-                      : "border-border/60 bg-background/20 opacity-65"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="break-words font-bold">{service.nome}</h3>
-                        <span className="rounded-lg border border-primary/25 bg-primary/10 px-2 py-1 text-[10px] font-bold text-primary">
-                          {service.categoria === "LAVAGEM" ? "LAVAGEM" : "ADICIONAL"}
-                        </span>
-                        {!service.ativo ? (
-                          <span className="rounded-lg border border-border px-2 py-1 text-[10px] text-muted-foreground">
-                            INATIVO
+            <div className="mt-5 space-y-3">
+              <AnimatePresence initial={true} mode="popLayout">
+                {rows.map((service, index) => (
+                  <m.article
+                    key={service.id}
+                    layout
+                    initial={{ opacity: 0, y: 14 }}
+                    animate={{
+                      opacity: service.ativo ? 1 : 0.65,
+                      y: 0,
+                      transition: { delay: Math.min(index, 8) * 0.04 },
+                    }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className={`rounded-2xl border p-4 transition-colors ${
+                      service.ativo
+                        ? "border-border bg-background/45 hover:border-primary/40"
+                        : "border-border/60 bg-background/20"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="break-words font-bold">{service.nome}</h3>
+                          <span className="rounded-lg border border-primary/25 bg-primary/10 px-2 py-1 text-[10px] font-bold text-primary">
+                            {service.categoria === "LAVAGEM" ? "LAVAGEM" : "ADICIONAL"}
                           </span>
+                          {!service.ativo ? (
+                            <span className="rounded-lg border border-border px-2 py-1 text-[10px] text-muted-foreground">
+                              INATIVO
+                            </span>
+                          ) : null}
+                        </div>
+                        {service.descricao ? (
+                          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                            {service.descricao}
+                          </p>
                         ) : null}
                       </div>
-                      {service.descricao ? (
-                        <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                          {service.descricao}
-                        </p>
+                      <p className="shrink-0 text-lg font-bold text-primary">
+                        {brl(service.preco)}
+                      </p>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-3">
+                      <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Clock3 className="size-4" />
+                        {service.duracao_min
+                          ? `${service.duracao_min} minutos`
+                          : "Sem duração definida"}
+                      </p>
+                      {canManage ? (
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="rounded-xl"
+                            onClick={() => startEditing(service)}
+                          >
+                            <Pencil className="size-4" /> Editar
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="rounded-xl"
+                            disabled={statusMutation.isPending}
+                            onClick={() => statusMutation.mutate(service)}
+                          >
+                            {service.ativo ? (
+                              <PowerOff className="size-4" />
+                            ) : (
+                              <Power className="size-4" />
+                            )}
+                            {service.ativo ? "Desativar" : "Reativar"}
+                          </Button>
+                        </div>
                       ) : null}
                     </div>
-                    <p className="shrink-0 text-lg font-bold text-primary">{brl(service.preco)}</p>
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-3">
-                    <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Clock3 className="size-4" />
-                      {service.duracao_min
-                        ? `${service.duracao_min} minutos`
-                        : "Sem duração definida"}
-                    </p>
-                    {canManage ? (
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="rounded-xl"
-                          onClick={() => startEditing(service)}
-                        >
-                          <Pencil className="size-4" /> Editar
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="rounded-xl"
-                          disabled={statusMutation.isPending}
-                          onClick={() => statusMutation.mutate(service)}
-                        >
-                          {service.ativo ? (
-                            <PowerOff className="size-4" />
-                          ) : (
-                            <Power className="size-4" />
-                          )}
-                          {service.ativo ? "Desativar" : "Reativar"}
-                        </Button>
-                      </div>
-                    ) : null}
-                  </div>
-                </article>
-              ))}
+                  </m.article>
+                ))}
+              </AnimatePresence>
             </div>
           ) : (
             <div className="flex min-h-56 flex-col items-center justify-center text-center">

@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Car, ChevronRight, Clock3, Loader2, Search } from "lucide-react";
 import { AppShell } from "@/components/app/shell";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { listVehicles, plateHistory } from "@/lib/lavajato.functions";
@@ -103,7 +104,11 @@ function Veiculos() {
         </div>
 
         {vehiclesQuery.isLoading && (
-          <p className="py-6 text-sm text-muted-foreground">Carregando veículos…</p>
+          <div className="mt-3 grid gap-3 lg:grid-cols-2" aria-label="Carregando veículos">
+            {[0, 1, 2, 3].map((item) => (
+              <Skeleton key={item} className="h-40 rounded-2xl" />
+            ))}
+          </div>
         )}
         {vehiclesQuery.isError && (
           <p className="py-6 text-sm text-destructive">{(vehiclesQuery.error as Error).message}</p>
