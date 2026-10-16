@@ -27,6 +27,7 @@ import {
 import type { ReactNode } from "react";
 import { endDemoSession, getDemoBusiness, hasDemoSession } from "@/lib/demo-auth";
 import { WashMark } from "@/components/app/wash-brand";
+import { TenantLogo } from "@/components/app/tenant-logo";
 import { WashHoseBackdrop } from "@/components/app/wash-hose-backdrop";
 import { SubscriptionBanner } from "@/components/app/plan-gate";
 import { useFeature, useSessionQuery } from "@/hooks/use-plan";
@@ -94,7 +95,12 @@ export function AppShell({
             </Link>
           ) : null}
           <Link to="/home" aria-label="Início" className="shrink-0">
-            <WashMark className="size-7 text-primary" />
+            <TenantLogo
+              url={sessionQuery.data?.tenant?.logo_url}
+              name={businessName ?? "lava-jato"}
+              className="size-8"
+              fallback={<WashMark className="size-7 text-primary" />}
+            />
           </Link>
           <div className="min-w-0 flex-1 md:flex-none">
             <h1 className="truncate text-sm font-bold uppercase tracking-[0.08em]">{title}</h1>

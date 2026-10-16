@@ -918,7 +918,7 @@ export function demoUpdateBusinessProfile(data: {
   nome: string;
   telefone: string | null;
   endereco: string | null;
-  logo_url: string | null;
+  logo_url?: string | null;
   public_listing: boolean;
 }) {
   businessSettings = {
@@ -927,6 +927,13 @@ export function demoUpdateBusinessProfile(data: {
   };
   persistDemoBusinessSettings(businessSettings);
   return businessSettings;
+}
+
+/** No demo o logo fica salvo como data URL nas configurações locais. */
+export function demoSetLogo(logoUrl: string | null) {
+  businessSettings = { ...businessSettings, logo_url: logoUrl };
+  persistDemoBusinessSettings(businessSettings);
+  return { logo_url: logoUrl };
 }
 
 export function demoGetPixSettings() {

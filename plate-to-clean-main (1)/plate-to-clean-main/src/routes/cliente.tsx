@@ -25,6 +25,7 @@ import { getDemoBusiness, isDemoEnabled } from "@/lib/demo-auth";
 import { WashBrand } from "@/components/app/wash-brand";
 import { WashHoseBackdrop } from "@/components/app/wash-hose-backdrop";
 import { PlateBadge } from "@/components/app/plate-badge";
+import { TenantLogo } from "@/components/app/tenant-logo";
 import { OrderTimeline } from "@/components/app/order-timeline";
 import { Reveal } from "@/components/app/motion";
 import { m } from "motion/react";
@@ -192,7 +193,13 @@ function ClientPortal() {
             <div>
               <WashBrand suffix="CLIENTE" />
               <p className="mt-2 flex items-center gap-2 text-sm font-semibold">
-                <Building2 className="size-4 text-primary" /> {displayedTenant?.nome}
+                <TenantLogo
+                  url={data.tenant?.logo_url ?? displayedTenant?.logo_url}
+                  name={displayedTenant?.nome ?? "lava-jato"}
+                  className="size-7"
+                  fallback={<Building2 className="size-4 text-primary" />}
+                />{" "}
+                {displayedTenant?.nome}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {displayedTenant?.endereco ?? "Endereço não informado"}
@@ -488,7 +495,14 @@ function ClientPortal() {
                             }}
                             className="flex w-full items-start gap-3 rounded-xl p-3 text-left transition hover:bg-secondary"
                           >
-                            <Building2 className="mt-0.5 size-5 shrink-0 text-primary" />
+                            <TenantLogo
+                              url={tenant.logo_url}
+                              name={tenant.nome}
+                              className="size-9"
+                              fallback={
+                                <Building2 className="mt-0.5 size-5 shrink-0 text-primary" />
+                              }
+                            />
                             <span className="min-w-0">
                               <span className="block truncate text-sm font-semibold">
                                 {tenant.nome}
