@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  comparisonLabel,
+  comparisonRange,
   formatDay,
   matchesPaymentSearch,
   paymentsInRange,
@@ -114,5 +116,35 @@ describe("busca de pagamentos", () => {
       "4",
     ]);
     expect(payments.filter((p) => matchesPaymentSearch(p, "#5")).map((p) => p.id)).toEqual(["5"]);
+  });
+});
+
+describe("comparação entre períodos", () => {
+  it("mês atual compara com os mesmos dias do mês anterior", () => {
+    const range = periodRange("mes", NOW);
+    const prev = comparisonRange("mes", range);
+    expect([formatDay(prev.from), formatDay(prev.to)]).toEqual(["2026-09-01", "2026-09-17"]);
+    expect(comparisonLabel("mes", range)).toBe("em relação ao mesmo período de setembro");
+  });
+
+  it("mês anterior compara com o mês completo antes dele", () => {
+    const range = periodRange("mes_anterior", NOW);
+    const prev = comparisonRange("mes_anterior", range);
+    expect([formatDay(prev.from), formatDay(prev.to)]).toEqual(["2026-08-01", "2026-09-01"]);
+    expect(comparisonLabel("mes_anterior", range)).toBe("em relação a agosto");
+  });
+
+  it("7 e 30 dias comparam com o mesmo número de dias antes", () => {
+    const range = periodRange("30d", NOW);
+    const prev = comparisonRange("30d", range);
+    expect(formatDay(prev.to)).toBe(formatDay(range.from));
+    expect(comparisonLabel("30d", range)).toBe("em relação aos 30 dias anteriores");
+    expect(comparisonLabel("7d", periodRange("7d", NOW))).toBe("em relação aos 7 dias anteriores");
+  });
+
+  it("no fim de um mês longo, não passa do mês anterior", () => {
+    const range = periodRange("mes", new Date(2026, 2, 31, 12));
+    const prev = comparisonRange("mes", range);
+    expect(formatDay(prev.to)).toBe("2026-03-01");
   });
 });

@@ -84,6 +84,47 @@ export function previousRange(range: DateRange): DateRange {
   return { from: addDays(range.from, -days), to: range.from };
 }
 
+function monthName(year: number, month: number): string {
+  return new Date(year, month, 1).toLocaleDateString("pt-BR", { month: "long" });
+}
+
+/**
+ * Intervalo usado na comparação de cada período: no mês atual, os mesmos dias
+ * do mês anterior; no mês anterior, o mês completo antes dele; nos demais, o
+ * período imediatamente anterior com a mesma duração.
+ */
+export function comparisonRange(period: FinancePeriod, range: DateRange): DateRange {
+  const y = range.from.getFullYear();
+  const m = range.from.getMonth();
+  if (period === "mes") {
+    const days = Math.round((range.to.getTime() - range.from.getTime()) / DAY_MS);
+    const from = new Date(y, m - 1, 1);
+    const end = addDays(from, days);
+    const monthEnd = new Date(y, m, 1);
+    return { from, to: end < monthEnd ? end : monthEnd };
+  }
+  if (period === "mes_anterior") return { from: new Date(y, m - 1, 1), to: new Date(y, m, 1) };
+  return previousRange(range);
+}
+
+/** Texto da comparação, ex.: "em relação ao mesmo período de setembro". */
+export function comparisonLabel(period: FinancePeriod, range: DateRange): string {
+  const y = range.from.getFullYear();
+  const m = range.from.getMonth();
+  switch (period) {
+    case "7d":
+      return "em relação aos 7 dias anteriores";
+    case "30d":
+      return "em relação aos 30 dias anteriores";
+    case "mes":
+      return `em relação ao mesmo período de ${monthName(y, m - 1)}`;
+    case "mes_anterior":
+      return `em relação a ${monthName(y, m - 1)}`;
+    case "personalizado":
+      return "em relação ao período anterior";
+  }
+}
+
 function inRange(payment: PaymentRow, range: DateRange): boolean {
   const time = new Date(payment.pago_em).getTime();
   return time >= range.from.getTime() && time < range.to.getTime();

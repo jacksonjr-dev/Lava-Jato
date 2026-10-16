@@ -13,7 +13,8 @@ import {
   formatDay,
   paymentsInRange,
   periodRange,
-  previousRange,
+  comparisonLabel,
+  comparisonRange,
   revenueByDay,
   revenueByMethod,
   serviceStats,
@@ -31,7 +32,8 @@ export function RevenueInsights() {
   const [rankBy, setRankBy] = useState<"usos" | "receita">("receita");
 
   const range = periodRange(period.periodo, new Date(), period);
-  const previous = previousRange(range);
+  const previous = comparisonRange(period.periodo, range);
+  const comparison = comparisonLabel(period.periodo, range);
   const rangeKey = `${formatDay(previous.from)}_${formatDay(range.to)}`;
   // Uma consulta cobre o período atual e o anterior (para a comparação).
   const query = useQuery({
@@ -69,6 +71,7 @@ export function RevenueInsights() {
       <div className="grid gap-3 sm:grid-cols-3">
         <Kpi
           label="Receita"
+          comparison={comparison}
           value={analysis.now.receita}
           format={brl}
           change={variation(analysis.now.receita, analysis.before.receita)}
@@ -76,12 +79,14 @@ export function RevenueInsights() {
         />
         <Kpi
           label="Pagamentos"
+          comparison={comparison}
           value={analysis.now.pagamentos}
           change={variation(analysis.now.pagamentos, analysis.before.pagamentos)}
           loading={query.isLoading}
         />
         <Kpi
           label="Ticket médio"
+          comparison={comparison}
           value={analysis.now.ticketMedio}
           format={brl}
           change={variation(analysis.now.ticketMedio, analysis.before.ticketMedio)}
@@ -358,12 +363,14 @@ function Kpi({
   value,
   format,
   change,
+  comparison,
   loading,
 }: {
   label: string;
   value: number;
   format?: (value: number) => string;
   change: number | null;
+  comparison: string;
   loading: boolean;
 }) {
   const up = (change ?? 0) >= 0;
@@ -385,12 +392,12 @@ function Kpi({
         }`}
       >
         {change === null ? (
-          "sem base no período anterior"
+          "sem dados no período de comparação"
         ) : (
           <>
             {up ? <TrendingUp className="size-3.5" /> : <TrendingDown className="size-3.5" />}
             {up ? "+" : ""}
-            {change.toFixed(0)}% vs. período anterior
+            {change.toFixed(0)}% {comparison}
           </>
         )}
       </p>
