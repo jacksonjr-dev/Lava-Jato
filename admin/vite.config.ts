@@ -18,4 +18,19 @@ export default defineConfig({
     alias: { "@core": core },
   },
   server: { fs: { allow: [".", core] } },
+  environments: {
+    client: {
+      build: {
+        sourcemap: false,
+        rolldownOptions: {
+          output: {
+            // Arquivos públicos só com hash: o nome não revela telas nem funções.
+            entryFileNames: "assets/[hash].js",
+            chunkFileNames: "assets/[hash].js",
+            assetFileNames: "assets/[hash][extname]",
+          },
+        },
+      },
+    },
+  },
 });
