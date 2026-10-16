@@ -10,6 +10,7 @@ import {
   Clock,
   FileSpreadsheet,
   Menu,
+  MessageCircle,
   QrCode,
   ShieldCheck,
   Smartphone,
@@ -20,7 +21,7 @@ import {
 } from "lucide-react";
 import { WashBrand } from "@/components/app/wash-brand";
 import { WashHoseBackdrop } from "@/components/app/wash-hose-backdrop";
-import { PLAN_IDS, PLANS, TRIAL_DAYS } from "@/lib/plans";
+import { PLAN_IDS, PLANS, salesWhatsappLink, TRIAL_DAYS } from "@/lib/plans";
 import { m } from "motion/react";
 import { Stagger, StaggerItem } from "@/components/app/motion";
 
@@ -675,9 +676,25 @@ function Plans() {
           </StaggerItem>
         ))}
       </Stagger>
+      {SALES_CONTACT && (
+        <p className="mt-8 text-center text-sm text-muted-foreground">
+          Dúvidas sobre os planos?{" "}
+          <a
+            href={SALES_CONTACT}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 font-bold text-primary underline-offset-4 hover:underline"
+          >
+            <MessageCircle className="size-4" />
+            Fale com a gente no WhatsApp
+          </a>
+        </p>
+      )}
     </section>
   );
 }
+
+const SALES_CONTACT = salesWhatsappLink("Olá! Quero saber mais sobre o LavaPro.");
 
 const FAQ = [
   {
@@ -774,6 +791,7 @@ function SiteFooter() {
             { label: "Criar conta", to: "/auth", cadastro: true },
             { label: "Entrar", to: "/auth" },
             { label: "Planos", href: "#planos" },
+            ...(SALES_CONTACT ? [{ label: "Falar no WhatsApp", href: SALES_CONTACT }] : []),
           ]}
         />
         <FooterColumn
@@ -814,7 +832,13 @@ function FooterColumn({ title, links }: { title: string; links: FooterLink[] }) 
         {links.map((link) => (
           <li key={link.label}>
             {"href" in link ? (
-              <a href={link.href} className="hover:text-primary">
+              <a
+                href={link.href}
+                className="hover:text-primary"
+                {...(link.href.startsWith("http")
+                  ? { target: "_blank", rel: "noopener noreferrer" }
+                  : {})}
+              >
                 {link.label}
               </a>
             ) : link.to === "/auth" && link.cadastro ? (

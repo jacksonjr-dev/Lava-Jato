@@ -26,7 +26,7 @@ export const GRACE_DAYS = 3;
 export const FREE_MONTHLY_ORDER_LIMIT = 30;
 
 /** WhatsApp de vendas (somente dígitos, com DDI e DDD). Vazio esconde o botão. */
-export const SALES_WHATSAPP = "";
+export const SALES_WHATSAPP = "5585991502928";
 
 export const FEATURE_LABEL: Record<Feature, string> = {
   area_cliente: "Área do cliente",

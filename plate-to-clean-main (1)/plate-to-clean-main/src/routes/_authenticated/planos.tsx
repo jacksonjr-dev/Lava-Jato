@@ -105,7 +105,11 @@ function PlanCard({
   const whatsapp =
     id === "GRATIS"
       ? null
-      : salesWhatsappLink(`Olá! Quero assinar o plano ${plan.nome} do LavaPro para ${tenantName}.`);
+      : salesWhatsappLink(
+          current
+            ? `Olá! Quero renovar o plano ${plan.nome} do LavaPro para ${tenantName}.`
+            : `Olá! Quero assinar o plano ${plan.nome} do LavaPro para ${tenantName}.`,
+        );
 
   return (
     <article
@@ -150,7 +154,7 @@ function PlanCard({
             className="flex h-12 items-center justify-center gap-2 border border-primary bg-brand text-sm font-bold text-primary-foreground"
           >
             <MessageCircle className="size-4" />
-            ASSINAR PELO WHATSAPP
+            {current ? "RENOVAR PELO WHATSAPP" : "ASSINAR PELO WHATSAPP"}
           </a>
         ) : (
           <p className="border border-border p-3 text-center text-xs leading-5 text-muted-foreground">
