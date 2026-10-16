@@ -42,6 +42,7 @@ export const Route = createFileRoute("/_authenticated/financeiro")({
 function FinancialPage() {
   const financeiroLiberado = useFeature("financeiro");
   const exportacaoLiberada = useFeature("exportacao");
+  const analiseLiberada = useFeature("analise");
   const loadSummary = useServerFn(financialSummary);
   const query = useQuery({
     queryKey: ["financial-summary"],
@@ -175,7 +176,13 @@ function FinancialPage() {
               />
             </section>
 
-            <RevenueInsights />
+            {analiseLiberada ? (
+              <RevenueInsights />
+            ) : (
+              <div className="mt-6">
+                <UpgradeNotice feature="analise" compact />
+              </div>
+            )}
 
             <section className="mt-6 grid overflow-hidden rounded-2xl border border-border bg-card sm:grid-cols-2">
               <OperationalNumber

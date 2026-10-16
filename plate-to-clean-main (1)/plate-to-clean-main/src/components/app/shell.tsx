@@ -57,6 +57,7 @@ export function AppShell({
   const queryClient = useQueryClient();
   const sessionQuery = useSessionQuery();
   const financeiroLiberado = useFeature("financeiro");
+  const logoLiberado = useFeature("logo");
   const demoBusiness = getDemoBusiness();
   const businessName = demoBusiness?.nome ?? sessionQuery.data?.tenant?.nome;
 
@@ -96,7 +97,7 @@ export function AppShell({
           ) : null}
           <Link to="/home" aria-label="Início" className="shrink-0">
             <TenantLogo
-              url={sessionQuery.data?.tenant?.logo_url}
+              url={logoLiberado ? sessionQuery.data?.tenant?.logo_url : null}
               name={businessName ?? "lava-jato"}
               className="size-8"
               fallback={<WashMark className="size-7 text-primary" />}

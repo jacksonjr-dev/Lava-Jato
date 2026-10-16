@@ -8,6 +8,8 @@ import {
   applyAdminSubscriptionAction,
   assertFeature,
   hasFeature,
+  minimumPlanFor,
+  PLANS,
   resolveSubscription,
 } from "./plans";
 
@@ -114,5 +116,34 @@ describe("sincronia com o banco", () => {
     expect(migration).toContain(`plan_expires_at + interval '${GRACE_DAYS} days'`);
     expect(migration).toContain(`IF used >= ${FREE_MONTHLY_ORDER_LIMIT} THEN`);
     expect(migration).toContain("PERFORM app.assert_order_quota(tenant);");
+  });
+});
+
+describe("o que cada plano libera", () => {
+  it("segue a divisão equilibrada", () => {
+    expect(PLANS.GRATIS.features).toEqual([]);
+    expect(PLANS.BASICO.features).toEqual(["area_cliente", "pix", "financeiro", "logo"]);
+    expect(PLANS.MAX.features).toEqual([
+      "area_cliente",
+      "pix",
+      "financeiro",
+      "logo",
+      "analise",
+      "exportacao",
+      "placa_foto",
+    ]);
+  });
+
+  it("indica o menor plano de cada recurso", () => {
+    expect(minimumPlanFor("logo").id).toBe("BASICO");
+    expect(minimumPlanFor("financeiro").id).toBe("BASICO");
+    expect(minimumPlanFor("analise").id).toBe("MAX");
+    expect(minimumPlanFor("placa_foto").id).toBe("MAX");
+  });
+
+  it("o teste grátis libera tudo do Max", () => {
+    const sub = resolveSubscription({ plan: "GRATIS", trial_ends_at: days(2) }, NOW);
+    expect(hasFeature(sub, "analise")).toBe(true);
+    expect(hasFeature(sub, "logo")).toBe(true);
   });
 });

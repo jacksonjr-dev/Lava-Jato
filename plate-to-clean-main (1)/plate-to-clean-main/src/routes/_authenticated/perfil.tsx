@@ -16,6 +16,8 @@ import {
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/shell";
 import { LogoUploader } from "@/components/app/logo-uploader";
+import { UpgradeNotice } from "@/components/app/plan-gate";
+import { useFeature } from "@/hooks/use-plan";
 import { WashMark } from "@/components/app/wash-brand";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -56,6 +58,7 @@ function BusinessProfile() {
   const [businessHours, setBusinessHours] = useState<BusinessHours>(() => emptyBusinessHours());
   const [logoUrl, setLogoUrl] = useState("");
   const [publicListing, setPublicListing] = useState(true);
+  const logoLiberado = useFeature("logo");
 
   useEffect(() => {
     if (!tenant) return;
@@ -112,7 +115,9 @@ function BusinessProfile() {
               <div className="h-20 bg-brand opacity-80" />
               <div className="px-5 pb-5">
                 <Avatar className="-mt-10 size-20 border-4 border-card bg-secondary">
-                  {logoUrl ? <AvatarImage src={logoUrl} alt={`Logo de ${nome}`} /> : null}
+                  {logoUrl && logoLiberado ? (
+                    <AvatarImage src={logoUrl} alt={`Logo de ${nome}`} />
+                  ) : null}
                   <AvatarFallback className="bg-secondary text-primary">
                     <WashMark className="size-9" />
                   </AvatarFallback>
@@ -196,14 +201,18 @@ function BusinessProfile() {
                 />
               </Field>
               <div className="sm:col-span-2">
-                <LogoUploader
-                  logoUrl={logoUrl}
-                  name={nome}
-                  onChange={async (next) => {
-                    setLogoUrl(next ?? "");
-                    await queryClient.invalidateQueries({ queryKey: ["session"] });
-                  }}
-                />
+                {logoLiberado ? (
+                  <LogoUploader
+                    logoUrl={logoUrl}
+                    name={nome}
+                    onChange={async (next) => {
+                      setLogoUrl(next ?? "");
+                      await queryClient.invalidateQueries({ queryKey: ["session"] });
+                    }}
+                  />
+                ) : (
+                  <UpgradeNotice feature="logo" compact />
+                )}
               </div>
             </div>
 

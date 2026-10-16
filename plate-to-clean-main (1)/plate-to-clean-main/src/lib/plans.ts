@@ -10,7 +10,15 @@
 export const PLAN_IDS = ["GRATIS", "BASICO", "MAX"] as const;
 export type PlanId = (typeof PLAN_IDS)[number];
 
-export const FEATURES = ["area_cliente", "pix", "financeiro", "exportacao", "placa_foto"] as const;
+export const FEATURES = [
+  "area_cliente",
+  "pix",
+  "financeiro",
+  "logo",
+  "analise",
+  "exportacao",
+  "placa_foto",
+] as const;
 export type Feature = (typeof FEATURES)[number];
 
 export const TRIAL_DAYS = 7;
@@ -24,6 +32,8 @@ export const FEATURE_LABEL: Record<Feature, string> = {
   area_cliente: "Área do cliente",
   pix: "Cobrança PIX com QR Code",
   financeiro: "Painel financeiro",
+  logo: "Logo do lava-jato",
+  analise: "Análise de receita",
   exportacao: "Exportação do financeiro em PDF e Excel",
   placa_foto: "Leitura da placa pela foto",
 };
@@ -40,6 +50,8 @@ export type PlanDefinition = {
   itens: string[];
 };
 
+// Divisão "equilibrada": operação no Grátis; cliente, PIX, financeiro do mês e
+// logo no Básico; análise, exportação, foto da placa (e recursos futuros) no Max.
 export const PLANS: Record<PlanId, PlanDefinition> = {
   GRATIS: {
     id: "GRATIS",
@@ -50,9 +62,9 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     limiteMensalAtendimentos: FREE_MONTHLY_ORDER_LIMIT,
     itens: [
       `Até ${FREE_MONTHLY_ORDER_LIMIT} atendimentos por mês`,
-      "Atendimento pela placa",
-      "Ordens de serviço com status",
-      "Catálogo de serviços e veículos",
+      "Atendimento pela placa e ordens de serviço",
+      "Catálogo de serviços e veículos com filtros",
+      "Caixa do dia na tela de operação",
     ],
   },
   BASICO: {
@@ -61,26 +73,29 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     descricao: "Para lava-jatos com movimento diário.",
     preco: null,
     destaque: true,
-    features: ["area_cliente", "pix", "financeiro"],
+    features: ["area_cliente", "pix", "financeiro", "logo"],
     limiteMensalAtendimentos: null,
     itens: [
       "Atendimentos ilimitados",
       "Área do cliente com status em tempo real",
       "Cobrança PIX com QR Code",
-      "Painel financeiro completo",
+      "Financeiro do mês e lista de pagamentos",
+      "Logo do lava-jato no sistema e para o cliente",
     ],
   },
   MAX: {
     id: "MAX",
     nome: "Max",
-    descricao: "Para quem quer agilidade máxima no pátio.",
+    descricao: "Para quem quer gestão completa e agilidade no pátio.",
     preco: null,
-    features: ["area_cliente", "pix", "financeiro", "exportacao", "placa_foto"],
+    features: ["area_cliente", "pix", "financeiro", "logo", "analise", "exportacao", "placa_foto"],
     limiteMensalAtendimentos: null,
     itens: [
       "Tudo do Básico",
-      "Leitura da placa pela foto",
+      "Análise de receita: comparações, gráfico e serviços que mais dão retorno",
       "Exportação do financeiro em PDF e Excel",
+      "Leitura da placa pela foto",
+      "Em breve: equipe com login próprio e aviso por WhatsApp",
     ],
   },
 };
