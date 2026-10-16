@@ -58,7 +58,7 @@ function CompanyPage() {
             <SubscriptionBadge subscription={company.subscription} />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Card title="Contato">
               <Line label="Dono" value={company.ownerEmail ?? "—"} />
               <Line label="Telefone" value={company.telefone ?? "—"} />
@@ -69,7 +69,7 @@ function CompanyPage() {
               <Line label="Em vigor" value={PLANS[company.subscription.effectivePlan].nome} />
               <Line label="Vencimento" value={expiryText(company.subscription)} />
             </Card>
-            <Card title="Uso">
+            <Card title="Uso" className="sm:col-span-2 lg:col-span-1">
               <Line
                 label="Atendimentos no mês"
                 value={

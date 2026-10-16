@@ -1,5 +1,6 @@
 import { createFileRoute, Link, Outlet, redirect, useNavigate } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { Building2, LayoutDashboard, LogOut, Wallet } from "lucide-react";
 import { WashMark } from "@/components/app/wash-brand";
@@ -12,7 +13,7 @@ export const Route = createFileRoute("/_admin")({
   // em cada chamada, inclusive se o usuário está em platform_admins.
   beforeLoad: async () => {
     if (isAdminDemo()) {
-      if (localStorage.getItem(DEMO_SESSION_KEY) !== "1") throw redirect({ to: "/login" });
+      if (sessionStorage.getItem(DEMO_SESSION_KEY) !== "1") throw redirect({ to: "/login" });
       return { email: "admin@lavapro.local" };
     }
     const { data: level } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
@@ -30,10 +31,15 @@ function AdminLayout() {
 
   async function signOut() {
     queryClient.clear();
-    if (isAdminDemo()) localStorage.removeItem(DEMO_SESSION_KEY);
+    if (isAdminDemo()) sessionStorage.removeItem(DEMO_SESSION_KEY);
     else await supabase.auth.signOut();
     await navigate({ to: "/login", replace: true });
   }
+
+  useIdleSignOut(() => {
+    toast.info("Sessão encerrada após 30 minutos sem uso.");
+    void signOut();
+  });
 
   return (
     <div className="flex min-h-dvh flex-col bg-hero">
@@ -41,7 +47,7 @@ function AdminLayout() {
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4 md:px-6">
           <Link to="/visao-geral" className="flex shrink-0 items-center gap-2">
             <WashMark className="size-7 text-primary" />
-            <span className="plate text-xs text-primary">LAVAPRO ADMIN</span>
+            <span className="plate text-xs text-primary sm:hidden lg:inline">LAVAPRO ADMIN</span>
           </Link>
           {isAdminDemo() && (
             <span className="rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-[10px] font-bold text-warning">
@@ -52,7 +58,9 @@ function AdminLayout() {
             <NavItems />
           </nav>
           <div className="ml-auto flex items-center gap-3">
-            <span className="hidden truncate text-xs text-muted-foreground md:inline">{email}</span>
+            <span className="hidden max-w-56 truncate text-xs text-muted-foreground lg:inline">
+              {email}
+            </span>
             <button
               type="button"
               onClick={() => void signOut()}
@@ -76,6 +84,35 @@ function AdminLayout() {
   );
 }
 
+/** Encerra a sessão depois de 30 minutos sem interação (inclusive com a aba em segundo plano). */
+const IDLE_LIMIT_MS = 30 * 60 * 1000;
+
+function useIdleSignOut(onIdle: () => void) {
+  const lastActivity = useRef(Date.now());
+  const callback = useRef(onIdle);
+  callback.current = onIdle;
+
+  useEffect(() => {
+    const touch = () => {
+      lastActivity.current = Date.now();
+    };
+    const check = () => {
+      if (Date.now() - lastActivity.current >= IDLE_LIMIT_MS) callback.current();
+    };
+    const events = ["pointerdown", "keydown", "scroll", "touchstart"] as const;
+    for (const name of events) window.addEventListener(name, touch, { passive: true });
+    // Ao voltar para a aba, confere na hora (timers de abas paradas atrasam).
+    const onVisible = () => document.visibilityState === "visible" && check();
+    document.addEventListener("visibilitychange", onVisible);
+    const timer = window.setInterval(check, 30_000);
+    return () => {
+      for (const name of events) window.removeEventListener(name, touch);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.clearInterval(timer);
+    };
+  }, []);
+}
+
 const NAV = [
   { to: "/visao-geral", label: "Visão geral", icon: LayoutDashboard },
   { to: "/empresas", label: "Empresas", icon: Building2 },
@@ -86,7 +123,7 @@ function NavItems({ mobile = false }: { mobile?: boolean }) {
   return (
     <>
       {NAV.map(({ to, label, icon: Icon }) => (
-        <NavLink key={to} to={to} icon={<Icon className="size-4" />} mobile={mobile}>
+        <NavLink key={to} to={to} icon={<Icon className="size-4 shrink-0" />} mobile={mobile}>
           {label}
         </NavLink>
       ))}
@@ -113,7 +150,7 @@ function NavLink({
       className={
         mobile
           ? "flex flex-col items-center gap-0.5 rounded-xl py-1.5 text-[11px] font-semibold"
-          : "flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold"
+          : "flex items-center gap-2 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold [&_svg]:shrink-0"
       }
     >
       {icon}

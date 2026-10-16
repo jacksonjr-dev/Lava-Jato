@@ -4,15 +4,19 @@ export function Card({
   title,
   icon,
   action,
+  className = "",
   children,
 }: {
   title: string;
+  className?: string;
   icon?: ReactNode;
   action?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <section className="min-w-0 space-y-3 rounded-2xl border border-border bg-card p-5">
+    <section
+      className={`min-w-0 space-y-3 rounded-2xl border border-border bg-card p-5 ${className}`}
+    >
       <div className="flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {icon}
@@ -29,7 +33,7 @@ export function Line({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3 text-sm">
       <span className="text-muted-foreground">{label}</span>
-      <span className="truncate text-right font-medium">{value}</span>
+      <span className="min-w-0 text-right font-medium break-words">{value}</span>
     </div>
   );
 }

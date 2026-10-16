@@ -102,7 +102,7 @@ function LoginPage() {
       if (!/^\d{6}$/.test(code)) throw new Error("Digite os 6 números do autenticador.");
       if (demo) {
         if (code !== DEMO_ADMIN.code) throw new Error("Código incorreto.");
-        localStorage.setItem(DEMO_SESSION_KEY, "1");
+        sessionStorage.setItem(DEMO_SESSION_KEY, "1");
         return finish();
       }
       const { error: verifyError } = await supabase.auth.mfa.challengeAndVerify({ factorId, code });

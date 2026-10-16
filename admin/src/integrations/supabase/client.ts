@@ -20,9 +20,10 @@ function createBrowserClient() {
   return createClient<Database>(url, key, {
     global: { fetch: supabaseFetch(key) },
     auth: {
-      // Sessão separada da do app dos lava-jatos.
+      // Sessão separada da do app dos lava-jatos e guardada só nesta aba:
+      // fechou o navegador, precisa entrar de novo (senha + código).
       storageKey: "lavapro-admin-auth",
-      storage: typeof window === "undefined" ? undefined : window.localStorage,
+      storage: typeof window === "undefined" ? undefined : window.sessionStorage,
       persistSession: true,
       autoRefreshToken: true,
     },
