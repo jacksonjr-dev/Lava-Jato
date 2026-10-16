@@ -34,6 +34,7 @@ import {
   demoServices,
   demoSearchPublicTenants,
   demoSession,
+  demoSetLogo,
   demoSubscriptionFields,
   demoUpdateSubscription,
   demoUpdateOrderStatus,
@@ -49,6 +50,7 @@ import { assertCompatibleServices } from "./service-selection";
 import { assertOrderTransition } from "./order-flow";
 import { validateBusinessHours, type BusinessHours } from "./business-hours";
 import { matchesBusinessIdentity } from "./business-identity";
+import { logoExtension, parseLogoDataUrl } from "./logo";
 import {
   applyAdminSubscriptionAction,
   assertFeature,
@@ -194,6 +196,7 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
             telefone: portal.tenant.telefone,
             endereco: portal.tenant.endereco,
             horario: portal.tenant.horario,
+            logo_url: portal.tenant.logo_url,
             business_hours: portal.tenant.business_hours,
           },
           pix: hasFeature(subscription, "pix")
@@ -245,6 +248,7 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
               telefone: portal.tenant.telefone,
               endereco: portal.tenant.endereco,
               horario: portal.tenant.horario,
+              logo_url: portal.tenant.logo_url,
               business_hours: portal.tenant.business_hours,
             },
             pix: hasFeature(subscription, "pix")
@@ -302,7 +306,7 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
         supabaseAdmin
           .from("tenants")
           .select(
-            "id, slug, nome, telefone, endereco, horario, business_hours, pix_key, pix_receiver_name, pix_city, plan, trial_ends_at, plan_expires_at",
+            "id, slug, nome, telefone, endereco, horario, business_hours, logo_url, pix_key, pix_receiver_name, pix_city, plan, trial_ends_at, plan_expires_at",
           )
           .eq("id", vehicle.tenant_id)
           .single(),
@@ -332,6 +336,7 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
             telefone: tenant.telefone,
             endereco: tenant.endereco,
             horario: tenant.horario,
+            logo_url: tenant.logo_url,
             business_hours: tenant.business_hours,
           }
         : null,
@@ -417,7 +422,7 @@ export const updateTenantProfile = createServerFn({ method: "POST" })
       telefone?: string;
       endereco?: string;
       business_hours: BusinessHours;
-      logo_url?: string;
+      logo_url?: string | undefined;
       public_listing: boolean;
     }) => data,
   )
@@ -454,7 +459,7 @@ export const updateTenantProfile = createServerFn({ method: "POST" })
       telefone,
       endereco,
       business_hours: businessHours as unknown as Json,
-      logo_url: logoUrl,
+      ...(data.logo_url !== undefined ? { logo_url: logoUrl } : {}),
       public_listing: data.public_listing,
     };
 
@@ -1191,4 +1196,45 @@ export const adminUpdateSubscription = createServerFn({ method: "POST" })
       .single();
     if (updateError) throw new Error("Não foi possível atualizar o plano.");
     return updated;
+  });
+
+/**
+ * Envia (data URL) ou remove (null) o logo do lava-jato. A imagem é validada
+ * no servidor e salva na pasta pública "logos", em uma subpasta da empresa.
+ */
+export const setTenantLogo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { image: string | null }) => data)
+  .handler(async ({ data, context }) => {
+    const logo = data.image === null ? null : parseLogoDataUrl(String(data.image));
+    if (isDemoServerMode()) return demoSetLogo(logo ? String(data.image) : null);
+
+    const { tenantId } = await requireManager(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const bucket = supabaseAdmin.storage.from("logos");
+    let logoUrl: string | null = null;
+    let keep: string | null = null;
+    if (logo) {
+      keep = `logo-${Date.now()}.${logoExtension(logo.contentType)}`;
+      const { error } = await bucket.upload(`${tenantId}/${keep}`, logo.bytes, {
+        contentType: logo.contentType,
+        cacheControl: "31536000",
+        upsert: false,
+      });
+      if (error) throw new Error("Não foi possível enviar o logo. Tente novamente.");
+      logoUrl = bucket.getPublicUrl(`${tenantId}/${keep}`).data.publicUrl;
+    }
+    const { error: updateError } = await context.supabase
+      .from("tenants")
+      .update({ logo_url: logoUrl })
+      .eq("id", tenantId);
+    if (updateError) throw new Error("Não foi possível salvar o logo.");
+
+    // Apaga os logos anteriores da empresa (o nome muda a cada envio para não ficar em cache).
+    const { data: files } = await bucket.list(tenantId);
+    const old = (files ?? [])
+      .filter((file) => file.name !== keep)
+      .map((file) => `${tenantId}/${file.name}`);
+    if (old.length) await bucket.remove(old);
+    return { logo_url: logoUrl };
   });
