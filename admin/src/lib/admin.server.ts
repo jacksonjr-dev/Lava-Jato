@@ -10,6 +10,7 @@ import {
   type PaymentInput,
   type PaymentRecord,
 } from "./billing";
+import type { FinancePayment } from "./finance";
 import {
   planChange,
   withSubscription,
@@ -220,4 +221,32 @@ export async function getMetrics(): Promise<BusinessMetrics> {
     (payments.data ?? []) as PaymentRecord[],
     new Set((activations.data ?? []).map((event) => event.tenant_id)),
   );
+}
+
+export async function getFinanceData(): Promise<{
+  payments: FinancePayment[];
+  companies: CompanyRow[];
+}> {
+  const db = createAdminClient();
+  // 24 meses: o período de 12 meses é comparado com os 12 anteriores.
+  const since = new Date();
+  since.setMonth(since.getMonth() - 24, 1);
+  const [companies, payments] = await Promise.all([
+    listCompanies(),
+    db
+      .from("subscription_payments")
+      .select(PAYMENT_COLUMNS)
+      .gte("paid_at", since.toISOString())
+      .order("paid_at", { ascending: false })
+      .limit(20_000),
+  ]);
+  if (payments.error) throw new Error("Não foi possível carregar os pagamentos.");
+  const names = new Map(companies.map((company) => [company.id, company.nome]));
+  return {
+    companies,
+    payments: ((payments.data ?? []) as PaymentRecord[]).map((payment) => ({
+      ...payment,
+      tenantName: names.get(payment.tenant_id) ?? "Empresa removida",
+    })),
+  };
 }

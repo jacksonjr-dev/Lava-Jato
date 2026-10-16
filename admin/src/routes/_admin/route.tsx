@@ -1,7 +1,7 @@
 import { createFileRoute, Link, Outlet, redirect, useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Building2, LayoutDashboard, LogOut } from "lucide-react";
+import { Building2, LayoutDashboard, LogOut, Wallet } from "lucide-react";
 import { WashMark } from "@/components/app/wash-brand";
 import { supabase } from "@/integrations/supabase/client";
 import { DEMO_SESSION_KEY, isAdminDemo } from "@/lib/demo-flag";
@@ -37,24 +37,19 @@ function AdminLayout() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-hero">
-      <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur-md">
+      <header className="sticky top-0 z-30 border-b border-border bg-background/95">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4 md:px-6">
           <Link to="/visao-geral" className="flex shrink-0 items-center gap-2">
             <WashMark className="size-7 text-primary" />
-            <span className="plate hidden text-xs text-primary sm:inline">LAVAPRO ADMIN</span>
+            <span className="plate text-xs text-primary">LAVAPRO ADMIN</span>
           </Link>
           {isAdminDemo() && (
-            <span className="hidden rounded-full border border-warning/40 sm:inline bg-warning/10 px-2 py-0.5 text-[10px] font-bold text-warning">
+            <span className="rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-[10px] font-bold text-warning">
               DEMONSTRAÇÃO
             </span>
           )}
-          <nav className="flex items-center gap-1 sm:ml-4">
-            <NavLink to="/visao-geral" icon={<LayoutDashboard className="size-4" />}>
-              Visão geral
-            </NavLink>
-            <NavLink to="/empresas" icon={<Building2 className="size-4" />}>
-              Empresas
-            </NavLink>
+          <nav className="ml-4 hidden items-center gap-1 sm:flex">
+            <NavItems />
           </nav>
           <div className="ml-auto flex items-center gap-3">
             <span className="hidden truncate text-xs text-muted-foreground md:inline">{email}</span>
@@ -68,28 +63,58 @@ function AdminLayout() {
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 md:px-6 md:py-8">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-6 pb-24 sm:pb-8 md:px-6 md:pt-8">
         <Outlet />
       </main>
+      <nav
+        aria-label="Navegação principal"
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 gap-1 border-t border-border bg-background/95 px-2 pt-1.5 pb-[calc(env(safe-area-inset-bottom,0px)+0.375rem)] sm:hidden"
+      >
+        <NavItems mobile />
+      </nav>
     </div>
+  );
+}
+
+const NAV = [
+  { to: "/visao-geral", label: "Visão geral", icon: LayoutDashboard },
+  { to: "/empresas", label: "Empresas", icon: Building2 },
+  { to: "/financeiro", label: "Financeiro", icon: Wallet },
+] as const;
+
+function NavItems({ mobile = false }: { mobile?: boolean }) {
+  return (
+    <>
+      {NAV.map(({ to, label, icon: Icon }) => (
+        <NavLink key={to} to={to} icon={<Icon className="size-4" />} mobile={mobile}>
+          {label}
+        </NavLink>
+      ))}
+    </>
   );
 }
 
 function NavLink({
   to,
   icon,
+  mobile,
   children,
 }: {
-  to: "/visao-geral" | "/empresas";
+  to: (typeof NAV)[number]["to"];
   icon: ReactNode;
+  mobile: boolean;
   children: ReactNode;
 }) {
   return (
     <Link
       to={to}
-      activeProps={{ className: "bg-secondary text-foreground" }}
+      activeProps={{ className: mobile ? "text-primary" : "bg-secondary text-foreground" }}
       inactiveProps={{ className: "text-muted-foreground" }}
-      className="flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold"
+      className={
+        mobile
+          ? "flex flex-col items-center gap-0.5 rounded-xl py-1.5 text-[11px] font-semibold"
+          : "flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold"
+      }
     >
       {icon}
       {children}

@@ -106,11 +106,11 @@ export function validateNote(body: string): string {
 // Números do negócio
 // ---------------------------------------------------------------------------
 
-function monthKey(date: Date): string {
+export function monthKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function lastMonths(now: Date, count: number) {
+export function lastMonths(now: Date, count: number) {
   return Array.from({ length: count }, (_, index) => {
     const date = new Date(now.getFullYear(), now.getMonth() - (count - 1 - index), 1);
     return {

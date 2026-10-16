@@ -12,7 +12,7 @@ export function Card({
   children: ReactNode;
 }) {
   return (
-    <section className="space-y-3 rounded-2xl border border-border bg-card p-5">
+    <section className="min-w-0 space-y-3 rounded-2xl border border-border bg-card p-5">
       <div className="flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {icon}

@@ -29,6 +29,7 @@ function useUpdateCompany(companyId: string) {
     queryClient.setQueryData(["company", companyId], updated);
     void queryClient.invalidateQueries({ queryKey: ["companies"] });
     void queryClient.invalidateQueries({ queryKey: ["metrics"] });
+    void queryClient.invalidateQueries({ queryKey: ["finance"] });
   };
 }
 

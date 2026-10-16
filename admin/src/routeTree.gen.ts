@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteRouteImport } from './routes/_admin/route'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as AdminFinanceiroRouteImport } from './routes/_admin/financeiro'
 import { Route as AdminVisaoGeralRouteImport } from './routes/_admin/visao-geral'
 import { Route as AdminEmpresasIndexRouteImport } from './routes/_admin/empresas.index'
 import { Route as AdminEmpresasIdRouteImport } from './routes/_admin/empresas.$id'
@@ -29,6 +30,11 @@ const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AdminFinanceiroRoute = AdminFinanceiroRouteImport.update({
+  id: '/financeiro',
+  path: '/financeiro',
+  getParentRoute: () => AdminRouteRoute,
 } as any)
 const AdminVisaoGeralRoute = AdminVisaoGeralRouteImport.update({
   id: '/visao-geral',
@@ -49,6 +55,7 @@ const AdminEmpresasIdRoute = AdminEmpresasIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/financeiro': typeof AdminFinanceiroRoute
   '/visao-geral': typeof AdminVisaoGeralRoute
   '/empresas/$id': typeof AdminEmpresasIdRoute
   '/empresas/': typeof AdminEmpresasIndexRoute
@@ -56,6 +63,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/financeiro': typeof AdminFinanceiroRoute
   '/visao-geral': typeof AdminVisaoGeralRoute
   '/empresas/$id': typeof AdminEmpresasIdRoute
   '/empresas': typeof AdminEmpresasIndexRoute
@@ -65,20 +73,34 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_admin': typeof AdminRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/_admin/financeiro': typeof AdminFinanceiroRoute
   '/_admin/visao-geral': typeof AdminVisaoGeralRoute
   '/_admin/empresas/$id': typeof AdminEmpresasIdRoute
   '/_admin/empresas/': typeof AdminEmpresasIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/visao-geral' | '/empresas/$id' | '/empresas/'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/financeiro'
+    | '/visao-geral'
+    | '/empresas/$id'
+    | '/empresas/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/visao-geral' | '/empresas/$id' | '/empresas'
+  to:
+    | '/'
+    | '/login'
+    | '/financeiro'
+    | '/visao-geral'
+    | '/empresas/$id'
+    | '/empresas'
   id:
     | '__root__'
     | '/'
     | '/_admin'
     | '/login'
+    | '/_admin/financeiro'
     | '/_admin/visao-geral'
     | '/_admin/empresas/$id'
     | '/_admin/empresas/'
@@ -113,6 +135,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_admin/financeiro': {
+      id: '/_admin/financeiro'
+      path: '/financeiro'
+      fullPath: '/financeiro'
+      preLoaderRoute: typeof AdminFinanceiroRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/_admin/visao-geral': {
       id: '/_admin/visao-geral'
       path: '/visao-geral'
@@ -138,12 +167,14 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteRouteChildren {
+  AdminFinanceiroRoute: typeof AdminFinanceiroRoute
   AdminVisaoGeralRoute: typeof AdminVisaoGeralRoute
   AdminEmpresasIdRoute: typeof AdminEmpresasIdRoute
   AdminEmpresasIndexRoute: typeof AdminEmpresasIndexRoute
 }
 
 const AdminRouteRouteChildren: AdminRouteRouteChildren = {
+  AdminFinanceiroRoute: AdminFinanceiroRoute,
   AdminVisaoGeralRoute: AdminVisaoGeralRoute,
   AdminEmpresasIdRoute: AdminEmpresasIdRoute,
   AdminEmpresasIndexRoute: AdminEmpresasIndexRoute,

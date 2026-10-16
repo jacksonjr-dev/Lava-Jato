@@ -12,6 +12,7 @@ import {
   type PaymentInput,
   type PaymentRecord,
 } from "./billing";
+import type { FinancePayment } from "./finance";
 import {
   planChange,
   withSubscription,
@@ -280,4 +281,16 @@ export function demoGetMetrics(): BusinessMetrics {
     state.payments,
     new Set(state.events.filter((event) => event.action === "ATIVAR").map((e) => e.tenant_id)),
   );
+}
+
+export function demoGetFinanceData(): { payments: FinancePayment[]; companies: CompanyRow[] } {
+  const state = load();
+  const names = new Map(state.companies.map((company) => [company.id, company.nome]));
+  return {
+    companies: demoListCompanies(),
+    payments: state.payments.map((payment) => ({
+      ...payment,
+      tenantName: names.get(payment.tenant_id) ?? "Empresa removida",
+    })),
+  };
 }

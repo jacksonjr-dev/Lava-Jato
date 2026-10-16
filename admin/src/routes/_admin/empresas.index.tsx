@@ -68,7 +68,12 @@ function CompaniesPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-        <Stat label="Total" value={stats.total} onClick={() => update({ status: undefined })} />
+        <Stat
+          label="Total"
+          value={stats.total}
+          onClick={() => update({ status: undefined })}
+          className="hidden md:block"
+        />
         <Stat label="Em teste" value={stats.teste} onClick={() => update({ status: "TESTE" })} />
         <Stat
           label="Pagantes"
@@ -96,7 +101,7 @@ function CompaniesPage() {
           <Input
             value={search.q ?? ""}
             onChange={(e) => update({ q: e.target.value || undefined })}
-            placeholder="Nome, código, e-mail do dono ou telefone"
+            placeholder="Nome, e-mail ou telefone"
             aria-label="Buscar empresas"
             className="h-11 pr-10 pl-10"
           />
@@ -216,18 +221,20 @@ function Stat({
   hint,
   tone,
   onClick,
+  className = "",
 }: {
   label: string;
   value: number;
   hint?: string;
   tone?: "warning" | "primary";
   onClick: () => void;
+  className?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/50"
+      className={`rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/50 ${className}`}
     >
       <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         {label}

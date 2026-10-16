@@ -162,6 +162,7 @@ function PlanActions({ company }: { company: CompanyDetail }) {
       queryClient.setQueryData(["company", company.id], updated);
       void queryClient.invalidateQueries({ queryKey: ["companies"] });
       void queryClient.invalidateQueries({ queryKey: ["metrics"] });
+      void queryClient.invalidateQueries({ queryKey: ["finance"] });
       setReason("");
       toast.success("Plano atualizado e registrado no histórico.");
     },

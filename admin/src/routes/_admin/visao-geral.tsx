@@ -1,9 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import type { ReactNode } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/app/panel";
+import { Bars, Change, shortMoney, Stat } from "@/components/app/stats";
 import { getMetrics } from "@/lib/admin.functions";
 import { formatMoney } from "@/lib/billing";
 
@@ -99,106 +99,6 @@ function OverviewPage() {
           </div>
         </>
       )}
-    </div>
-  );
-}
-
-function shortMoney(value: number) {
-  return value >= 1000
-    ? `R$ ${(value / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mil`
-    : `R$ ${Math.round(value)}`;
-}
-
-function Stat({
-  label,
-  value,
-  hint,
-  to,
-}: {
-  label: string;
-  value: string;
-  hint: ReactNode;
-  to?: "ATIVA" | "TESTE" | "vencendo";
-}) {
-  const body = (
-    <>
-      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {label}
-      </p>
-      <p className="mt-2 text-2xl font-bold tabular-nums">{value}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
-    </>
-  );
-  const className = "block rounded-2xl border border-border bg-card p-5";
-  return to ? (
-    <Link
-      to="/empresas"
-      search={{ status: to }}
-      className={`${className} transition-colors hover:border-primary/50`}
-    >
-      {body}
-    </Link>
-  ) : (
-    <div className={className}>{body}</div>
-  );
-}
-
-function Change({ current, previous }: { current: number; previous: number }) {
-  if (previous === 0) {
-    return <>{current > 0 ? "Mês anterior sem recebimentos" : "Nenhum recebimento ainda"}</>;
-  }
-  const change = Math.round(((current - previous) / previous) * 100);
-  return (
-    <>
-      <span
-        className={change >= 0 ? "font-semibold text-success" : "font-semibold text-destructive"}
-      >
-        {change >= 0 ? "+" : ""}
-        {change}%
-      </span>{" "}
-      em relação ao mês anterior
-    </>
-  );
-}
-
-function Bars({
-  data,
-  format,
-  short = format,
-}: {
-  data: Array<{ key: string; label: string; valor: number }>;
-  format: (value: number) => string;
-  /** Rótulo curto em cima da barra; o valor completo fica na dica. */
-  short?: (value: number) => string;
-}) {
-  const max = Math.max(...data.map((item) => item.valor), 1);
-  return (
-    <div className="flex h-48 items-end gap-2 pt-6">
-      {data.map((item, index) => {
-        const current = index === data.length - 1;
-        return (
-          <div
-            key={item.key}
-            className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1.5"
-          >
-            <span className="whitespace-nowrap text-[10px] font-semibold tabular-nums text-muted-foreground">
-              {item.valor ? short(item.valor) : ""}
-            </span>
-            <div className="flex w-full flex-1 items-end justify-center">
-              <div
-                className={`w-full max-w-12 rounded-t-lg ${current ? "bg-primary" : "bg-primary/35"}`}
-                style={{ height: `${Math.max((item.valor / max) * 100, item.valor ? 4 : 1)}%` }}
-                title={`${item.label}: ${format(item.valor)}`}
-              />
-            </div>
-            <span
-              className={`text-xs capitalize ${current ? "font-semibold" : "text-muted-foreground"}`}
-            >
-              {item.label}
-            </span>
-          </div>
-        );
-      })}
     </div>
   );
 }

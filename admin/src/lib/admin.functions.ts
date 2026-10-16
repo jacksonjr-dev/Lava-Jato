@@ -127,3 +127,12 @@ export const addNote = createServerFn({ method: "POST" })
       ? (await import("./demo.server")).demoAddNote(data.id, data.body)
       : (await import("./admin.server")).addNote(data.id, data.body, context),
   );
+
+export const getFinanceData = createServerFn({ method: "GET" })
+  .middleware([requireAdmin])
+  .handler(async () => {
+    const { payments, companies } = isDemo()
+      ? (await import("./demo.server")).demoGetFinanceData()
+      : await (await import("./admin.server")).getFinanceData();
+    return { payments, companies: companies.map((row) => withSubscription(row)) };
+  });
