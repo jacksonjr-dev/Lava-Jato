@@ -71,13 +71,23 @@ const SECURITY_HEADERS: Record<string, string> = {
   "Permissions-Policy": "camera=(self), microphone=(), geolocation=()",
 };
 
-function withSecurityHeaders(response: Response): Response {
+/**
+ * Só a página inicial (landing) deve aparecer em buscadores. As demais (login,
+ * área do cliente, painel) recebem noindex por cabeçalho — sem listá-las no
+ * robots.txt, que é público e serviria de mapa do sistema.
+ */
+function isIndexable(request: Request): boolean {
+  return new URL(request.url).pathname === "/";
+}
+
+function withSecurityHeaders(response: Response, request: Request): Response {
   // No desenvolvimento o Vite usa scripts e WebSocket próprios; aplica só em produção.
   if (!import.meta.env.PROD) return response;
   const headers = new Headers(response.headers);
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
     if (!headers.has(name)) headers.set(name, value);
   }
+  if (!isIndexable(request)) headers.set("X-Robots-Tag", "noindex, nofollow");
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
@@ -90,7 +100,7 @@ export default {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return withSecurityHeaders(await normalizeCatastrophicSsrResponse(response));
+      return withSecurityHeaders(await normalizeCatastrophicSsrResponse(response), request);
     } catch (error) {
       console.error(error);
       return withSecurityHeaders(
@@ -98,6 +108,7 @@ export default {
           status: 500,
           headers: { "content-type": "text/html; charset=utf-8" },
         }),
+        request,
       );
     }
   },
