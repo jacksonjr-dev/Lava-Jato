@@ -1,6 +1,16 @@
 import { financialPeriod } from "@core/lib/financial";
 import { createAdminClient } from "@/integrations/supabase/client.server";
 import {
+  businessMetrics,
+  paymentReason,
+  validateNote,
+  validatePayment,
+  type BusinessMetrics,
+  type NoteRecord,
+  type PaymentInput,
+  type PaymentRecord,
+} from "./billing";
+import {
   planChange,
   withSubscription,
   type CompanyDetail,
@@ -10,6 +20,9 @@ import {
 } from "./companies";
 
 type Admin = { adminUserId: string | null; adminEmail: string | null };
+
+const PAYMENT_COLUMNS =
+  "id, tenant_id, amount, method, paid_at, plan, months, note, admin_email, created_at";
 
 const TENANT_COLUMNS =
   "id, nome, slug, telefone, logo_url, created_at, plan, trial_ends_at, plan_expires_at";
@@ -67,7 +80,7 @@ export async function getCompany(id: string): Promise<CompanyDetail> {
     .maybeSingle();
   if (error || !tenant) throw new Error("Empresa não encontrada.");
   const monthStart = financialPeriod(new Date()).startMonth.toISOString();
-  const [emails, members, month, total, events] = await Promise.all([
+  const [emails, members, month, total, events, payments, notes] = await Promise.all([
     ownerEmails(db, [id]),
     db.from("tenant_members").select("id", { count: "exact", head: true }).eq("tenant_id", id),
     db
@@ -84,6 +97,18 @@ export async function getCompany(id: string): Promise<CompanyDetail> {
       .eq("tenant_id", id)
       .order("created_at", { ascending: false })
       .limit(20),
+    db
+      .from("subscription_payments")
+      .select(PAYMENT_COLUMNS)
+      .eq("tenant_id", id)
+      .order("paid_at", { ascending: false })
+      .limit(20),
+    db
+      .from("tenant_notes")
+      .select("id, tenant_id, body, admin_email, created_at")
+      .eq("tenant_id", id)
+      .order("created_at", { ascending: false })
+      .limit(30),
   ]);
   return {
     ...withSubscription({
@@ -94,6 +119,8 @@ export async function getCompany(id: string): Promise<CompanyDetail> {
     members: members.count ?? 0,
     ordersTotal: total.count ?? 0,
     events: (events.data ?? []) as SubscriptionEvent[],
+    payments: (payments.data ?? []) as PaymentRecord[],
+    notes: (notes.data ?? []) as NoteRecord[],
   };
 }
 
@@ -129,4 +156,68 @@ export async function changeSubscription(
   });
   if (eventError) console.error("[admin] histórico não registrado", eventError.message);
   return getCompany(id);
+}
+
+export async function recordPayment(
+  id: string,
+  input: PaymentInput,
+  admin: Admin,
+): Promise<CompanyDetail> {
+  const payment = validatePayment(input);
+  const db = createAdminClient();
+  const { error } = await db.from("subscription_payments").insert({
+    tenant_id: id,
+    amount: payment.amount,
+    method: payment.method,
+    paid_at: payment.paidAt,
+    plan: payment.activate?.plan ?? null,
+    months: payment.activate?.months ?? null,
+    note: payment.note,
+    admin_user_id: admin.adminUserId,
+    admin_email: admin.adminEmail,
+  });
+  if (error) throw new Error("Não foi possível registrar o pagamento.");
+  if (payment.activate) {
+    return changeSubscription(
+      id,
+      { action: "ATIVAR", ...payment.activate },
+      paymentReason(payment.amount, payment.method, payment.note),
+      admin,
+    );
+  }
+  return getCompany(id);
+}
+
+export async function addNote(id: string, body: string, admin: Admin): Promise<CompanyDetail> {
+  const db = createAdminClient();
+  const { error } = await db.from("tenant_notes").insert({
+    tenant_id: id,
+    body: validateNote(body),
+    admin_user_id: admin.adminUserId,
+    admin_email: admin.adminEmail,
+  });
+  if (error) throw new Error("Não foi possível salvar a nota.");
+  return getCompany(id);
+}
+
+export async function getMetrics(): Promise<BusinessMetrics> {
+  const db = createAdminClient();
+  // 13 meses cobrem o último pagamento de quem pagou um plano anual.
+  const since = new Date();
+  since.setMonth(since.getMonth() - 13);
+  const [rows, payments, activations] = await Promise.all([
+    listCompanies(),
+    db
+      .from("subscription_payments")
+      .select(PAYMENT_COLUMNS)
+      .gte("paid_at", since.toISOString())
+      .limit(10_000),
+    db.from("subscription_events").select("tenant_id").eq("action", "ATIVAR").limit(10_000),
+  ]);
+  if (payments.error) throw new Error("Não foi possível carregar os pagamentos.");
+  return businessMetrics(
+    rows.map((row) => withSubscription(row)),
+    (payments.data ?? []) as PaymentRecord[],
+    new Set((activations.data ?? []).map((event) => event.tenant_id)),
+  );
 }

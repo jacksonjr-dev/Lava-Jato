@@ -51,7 +51,7 @@ function LoginPage() {
       if (!demo) await supabase.auth.signOut();
       throw err;
     }
-    await navigate({ to: "/empresas", replace: true });
+    await navigate({ to: "/visao-geral", replace: true });
   }
 
   /** Depois da senha: pede o código, ou configura o autenticador na primeira vez. */
