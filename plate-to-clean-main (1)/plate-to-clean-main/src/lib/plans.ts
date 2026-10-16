@@ -72,7 +72,6 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     nome: "Básico",
     descricao: "Para lava-jatos com movimento diário.",
     preco: null,
-    destaque: true,
     features: ["area_cliente", "pix", "financeiro", "logo"],
     limiteMensalAtendimentos: null,
     itens: [
@@ -88,6 +87,7 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     nome: "Max",
     descricao: "Para quem quer gestão completa e agilidade no pátio.",
     preco: null,
+    destaque: true,
     features: ["area_cliente", "pix", "financeiro", "logo", "analise", "exportacao", "placa_foto"],
     limiteMensalAtendimentos: null,
     itens: [

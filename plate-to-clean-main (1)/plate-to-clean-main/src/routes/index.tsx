@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { WashBrand } from "@/components/app/wash-brand";
 import { WashHoseBackdrop } from "@/components/app/wash-hose-backdrop";
-import { PLAN_IDS, PLANS, salesWhatsappLink, TRIAL_DAYS } from "@/lib/plans";
+import { PLAN_IDS, PLANS, salesWhatsappLink, TRIAL_DAYS, type PlanId } from "@/lib/plans";
 import { m } from "motion/react";
 import { Stagger, StaggerItem } from "@/components/app/motion";
 
@@ -662,17 +662,7 @@ function Plans() {
                 </li>
               ))}
             </ul>
-            <Link
-              to="/auth"
-              search={{ modo: "cadastro" }}
-              className={`mt-8 flex h-12 items-center justify-center border text-sm font-bold ${
-                plan.destaque
-                  ? "border-primary bg-brand text-primary-foreground"
-                  : "border-border bg-secondary hover:border-primary/50 hover:text-primary"
-              }`}
-            >
-              COMEÇAR COM O {plan.nome.toUpperCase()}
-            </Link>
+            <PlanCta plan={plan} />
           </StaggerItem>
         ))}
       </Stagger>
@@ -691,6 +681,33 @@ function Plans() {
         </p>
       )}
     </section>
+  );
+}
+
+/** Grátis vai para o cadastro; os pagos abrem o WhatsApp para negociar. */
+function PlanCta({ plan }: { plan: (typeof PLANS)[PlanId] }) {
+  const className = `flex h-12 items-center justify-center gap-2 border text-sm font-bold ${
+    plan.destaque
+      ? "border-primary bg-brand text-primary-foreground"
+      : "border-border bg-secondary hover:border-primary/50 hover:text-primary"
+  }`;
+  const whatsapp =
+    plan.id === "GRATIS"
+      ? null
+      : salesWhatsappLink(`Olá! Quero contratar o plano ${plan.nome} do LavaPro.`);
+  return (
+    <div className="mt-auto pt-8">
+      {whatsapp ? (
+        <a href={whatsapp} target="_blank" rel="noopener noreferrer" className={className}>
+          <MessageCircle className="size-4" />
+          FALAR SOBRE O {plan.nome.toUpperCase()}
+        </a>
+      ) : (
+        <Link to="/auth" search={{ modo: "cadastro" }} className={className}>
+          COMEÇAR COM O {plan.nome.toUpperCase()}
+        </Link>
+      )}
+    </div>
   );
 }
 
