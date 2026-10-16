@@ -115,7 +115,7 @@ export function comparisonLabel(period: FinancePeriod, range: DateRange): string
     case "7d":
       return "em relação aos 7 dias anteriores";
     case "30d":
-      return "em relação aos 30 dias anteriores";
+      return "em relação ao mês anterior";
     case "mes":
       return `em relação ao mesmo período de ${monthName(y, m - 1)}`;
     case "mes_anterior":

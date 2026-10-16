@@ -138,7 +138,7 @@ describe("comparação entre períodos", () => {
     const range = periodRange("30d", NOW);
     const prev = comparisonRange("30d", range);
     expect(formatDay(prev.to)).toBe(formatDay(range.from));
-    expect(comparisonLabel("30d", range)).toBe("em relação aos 30 dias anteriores");
+    expect(comparisonLabel("30d", range)).toBe("em relação ao mês anterior");
     expect(comparisonLabel("7d", periodRange("7d", NOW))).toBe("em relação aos 7 dias anteriores");
   });
 
