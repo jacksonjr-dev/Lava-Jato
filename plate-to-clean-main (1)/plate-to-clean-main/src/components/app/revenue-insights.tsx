@@ -315,13 +315,6 @@ function DayChart({ days }: { days: DayRevenue[] }) {
               onClick={() => setPinned(isPinned ? null : day.day)}
               className="group relative flex h-full min-w-0 flex-1 flex-col items-center justify-end"
             >
-              {isPinned && (
-                <m.span
-                  layoutId="pinned-day"
-                  className="absolute -top-1 size-1.5 rounded-full bg-primary"
-                  aria-hidden="true"
-                />
-              )}
               <m.span
                 className={`w-full rounded-t-md transition-colors ${
                   isPinned
