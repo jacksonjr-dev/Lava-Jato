@@ -77,7 +77,7 @@ function Landing() {
 function SiteHeader() {
   const [open, setOpen] = useState(false);
   return (
-    <header className="wash-header sticky top-0 z-40 border-b border-border/60 bg-background/85 backdrop-blur">
+    <header className="wash-header sticky top-0 z-40 border-b border-border/60 bg-background/95">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4">
         <a href="#inicio" aria-label="LavaPro — início">
           <WashBrand />
@@ -194,12 +194,9 @@ function Hero() {
           animate={{ opacity: 1, y: 0, rotate: 0 }}
           transition={{ type: "spring", stiffness: 140, damping: 20, delay: 0.15 }}
         >
-          <m.div
-            animate={{ y: [0, -10, 0] }}
-            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-          >
+          <div className="float-slow">
             <OrderMockup />
-          </m.div>
+          </div>
         </m.div>
       </div>
 
@@ -519,9 +516,7 @@ function PhoneMockup() {
       initial={{ opacity: 0 }}
       whileInView={{ opacity: 1 }}
       viewport={{ once: true }}
-      animate={{ y: [0, -8, 0] }}
-      transition={{ y: { duration: 5, repeat: Infinity, ease: "easeInOut" } }}
-      className="mx-auto w-full max-w-[280px] border-[6px] border-secondary bg-background p-4 shadow-glow"
+      className="float-slow mx-auto w-full max-w-[280px] border-[6px] border-secondary bg-background p-4 shadow-glow"
     >
       <p className="text-[10px] text-muted-foreground">Olá, Carlos</p>
       <p className="plate mt-2 text-xl font-bold tracking-[0.1em]">ABC1D23</p>

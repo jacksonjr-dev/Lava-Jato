@@ -142,11 +142,9 @@ function AuthPage() {
         className="mx-auto grid w-full max-w-5xl overflow-hidden rounded-3xl border border-border bg-card shadow-card md:grid-cols-[1fr_1.1fr]"
       >
         <div className="relative hidden overflow-hidden border-r border-border bg-brand p-10 text-primary-foreground md:flex md:flex-col md:justify-between">
-          <m.span
+          <span
             aria-hidden="true"
-            className="absolute -right-24 -bottom-24 size-72 rounded-full bg-white/15 blur-2xl"
-            animate={{ scale: [1, 1.15, 1], opacity: [0.6, 1, 0.6] }}
-            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+            className="glow-breathe absolute -right-24 -bottom-24 size-72 rounded-full bg-white/15 blur-2xl"
           />
           <span className="inline-flex items-center gap-2.5">
             <WashMark className="size-8 text-primary-foreground" />

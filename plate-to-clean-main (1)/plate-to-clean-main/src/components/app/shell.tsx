@@ -84,7 +84,7 @@ export function AppShell({
   return (
     <div className="flex min-h-screen min-h-dvh flex-col bg-hero">
       <WashHoseBackdrop />
-      <header className="wash-header sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur-md">
+      <header className="wash-header sticky top-0 z-30 border-b border-border bg-background/95">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 md:px-6">
           {back ? (
             <Link
@@ -172,7 +172,7 @@ export function AppShell({
       {!back && (
         <nav
           aria-label="Navegação principal"
-          className="sticky bottom-0 z-30 border-t border-border bg-background/95 px-2 pt-1.5 pb-[calc(env(safe-area-inset-bottom,0px)+0.375rem)] backdrop-blur-md md:hidden"
+          className="sticky bottom-0 z-30 border-t border-border bg-background/95 px-2 pt-1.5 pb-[calc(env(safe-area-inset-bottom,0px)+0.375rem)] md:hidden"
         >
           <div className="mx-auto grid max-w-md grid-cols-4 gap-1">
             {tabs.map((tab) => (

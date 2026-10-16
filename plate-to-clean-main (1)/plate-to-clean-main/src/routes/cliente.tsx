@@ -117,7 +117,7 @@ function ClientBusinessHours({
       </button>
 
       {expanded ? (
-        <div className="mt-2 grid gap-1.5 rounded-2xl border border-border/70 bg-card/85 p-3 shadow-xl backdrop-blur sm:min-w-72">
+        <div className="mt-2 grid gap-1.5 rounded-2xl border border-border/70 bg-card/95 p-3 shadow-xl sm:min-w-72">
           {BUSINESS_DAYS.map(({ key, shortLabel }) => (
             <div
               key={key}
@@ -188,7 +188,7 @@ function ClientPortal() {
     return (
       <div className="min-h-screen min-h-dvh bg-hero">
         <WashHoseBackdrop />
-        <header className="wash-header border-b border-border/60 bg-background/85 px-5 py-4 backdrop-blur">
+        <header className="wash-header border-b border-border/60 bg-background/95 px-5 py-4">
           <div className="mx-auto flex max-w-5xl items-center justify-between">
             <div>
               <WashBrand suffix="CLIENTE" />
@@ -363,7 +363,7 @@ function ClientPortal() {
   return (
     <div className="page-enter min-h-screen min-h-dvh bg-hero">
       <WashHoseBackdrop />
-      <header className="wash-header border-b border-border/60 bg-background/85 px-5 py-4 backdrop-blur">
+      <header className="wash-header border-b border-border/60 bg-background/95 px-5 py-4">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <Link to="/" aria-label="Voltar para a página inicial">
             <WashBrand />

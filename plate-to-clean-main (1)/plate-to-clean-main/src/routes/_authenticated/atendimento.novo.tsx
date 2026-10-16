@@ -530,7 +530,7 @@ function NovoAtendimento() {
                     })}
                   </div>
 
-                  <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] backdrop-blur-md">
+                  <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)]">
                     <div className="mx-auto flex max-w-xl items-center gap-4">
                       <div className="min-w-0">
                         <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
