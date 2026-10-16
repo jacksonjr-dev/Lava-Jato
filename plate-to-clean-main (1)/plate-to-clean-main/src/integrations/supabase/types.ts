@@ -503,6 +503,54 @@ export type Database = {
           },
         ];
       };
+      subscription_events: {
+        Row: {
+          action: string;
+          admin_email: string | null;
+          admin_user_id: string | null;
+          created_at: string;
+          from_expires_at: string | null;
+          from_plan: string | null;
+          from_trial_ends_at: string | null;
+          id: string;
+          reason: string;
+          tenant_id: string;
+          to_expires_at: string | null;
+          to_plan: string | null;
+          to_trial_ends_at: string | null;
+        };
+        Insert: {
+          action: string;
+          admin_email?: string | null;
+          admin_user_id?: string | null;
+          created_at?: string;
+          from_expires_at?: string | null;
+          from_plan?: string | null;
+          from_trial_ends_at?: string | null;
+          id?: string;
+          reason: string;
+          tenant_id: string;
+          to_expires_at?: string | null;
+          to_plan?: string | null;
+          to_trial_ends_at?: string | null;
+        };
+        Update: {
+          action?: string;
+          admin_email?: string | null;
+          admin_user_id?: string | null;
+          created_at?: string;
+          from_expires_at?: string | null;
+          from_plan?: string | null;
+          from_trial_ends_at?: string | null;
+          id?: string;
+          reason?: string;
+          tenant_id?: string;
+          to_expires_at?: string | null;
+          to_plan?: string | null;
+          to_trial_ends_at?: string | null;
+        };
+        Relationships: [];
+      };
       tenant_integrations: {
         Row: {
           created_at: string;
