@@ -22,6 +22,7 @@ import { Route as AuthenticatedPlanosRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedServicosRouteImport } from './routes/_authenticated/servicos'
 import { Route as AuthenticatedVeiculosRouteImport } from './routes/_authenticated/veiculos'
 import { Route as AuthenticatedAtendimentoNovoRouteImport } from './routes/_authenticated/atendimento.novo'
+import { Route as AuthenticatedFinanceiroPagamentosRouteImport } from './routes/_authenticated/financeiro_.pagamentos'
 import { Route as AuthenticatedOsIdRouteImport } from './routes/_authenticated/os.$id'
 
 const IndexRoute = IndexRouteImport.update({
@@ -89,6 +90,12 @@ const AuthenticatedAtendimentoNovoRoute =
     path: '/atendimento/novo',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedFinanceiroPagamentosRoute =
+  AuthenticatedFinanceiroPagamentosRouteImport.update({
+    id: '/financeiro_/pagamentos',
+    path: '/financeiro/pagamentos',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedOsIdRoute = AuthenticatedOsIdRouteImport.update({
   id: '/os/$id',
   path: '/os/$id',
@@ -108,6 +115,7 @@ export interface FileRoutesByFullPath {
   '/servicos': typeof AuthenticatedServicosRoute
   '/veiculos': typeof AuthenticatedVeiculosRoute
   '/atendimento/novo': typeof AuthenticatedAtendimentoNovoRoute
+  '/financeiro/pagamentos': typeof AuthenticatedFinanceiroPagamentosRoute
   '/os/$id': typeof AuthenticatedOsIdRoute
 }
 export interface FileRoutesByTo {
@@ -123,6 +131,7 @@ export interface FileRoutesByTo {
   '/servicos': typeof AuthenticatedServicosRoute
   '/veiculos': typeof AuthenticatedVeiculosRoute
   '/atendimento/novo': typeof AuthenticatedAtendimentoNovoRoute
+  '/financeiro/pagamentos': typeof AuthenticatedFinanceiroPagamentosRoute
   '/os/$id': typeof AuthenticatedOsIdRoute
 }
 export interface FileRoutesById {
@@ -140,6 +149,7 @@ export interface FileRoutesById {
   '/_authenticated/servicos': typeof AuthenticatedServicosRoute
   '/_authenticated/veiculos': typeof AuthenticatedVeiculosRoute
   '/_authenticated/atendimento/novo': typeof AuthenticatedAtendimentoNovoRoute
+  '/_authenticated/financeiro_/pagamentos': typeof AuthenticatedFinanceiroPagamentosRoute
   '/_authenticated/os/$id': typeof AuthenticatedOsIdRoute
 }
 export interface FileRouteTypes {
@@ -157,6 +167,7 @@ export interface FileRouteTypes {
     | '/servicos'
     | '/veiculos'
     | '/atendimento/novo'
+    | '/financeiro/pagamentos'
     | '/os/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -172,6 +183,7 @@ export interface FileRouteTypes {
     | '/servicos'
     | '/veiculos'
     | '/atendimento/novo'
+    | '/financeiro/pagamentos'
     | '/os/$id'
   id:
     | '__root__'
@@ -188,6 +200,7 @@ export interface FileRouteTypes {
     | '/_authenticated/servicos'
     | '/_authenticated/veiculos'
     | '/_authenticated/atendimento/novo'
+    | '/_authenticated/financeiro_/pagamentos'
     | '/_authenticated/os/$id'
   fileRoutesById: FileRoutesById
 }
@@ -291,6 +304,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAtendimentoNovoRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/financeiro_/pagamentos': {
+      id: '/_authenticated/financeiro_/pagamentos'
+      path: '/financeiro/pagamentos'
+      fullPath: '/financeiro/pagamentos'
+      preLoaderRoute: typeof AuthenticatedFinanceiroPagamentosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/os/$id': {
       id: '/_authenticated/os/$id'
       path: '/os/$id'
@@ -311,6 +331,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedServicosRoute: typeof AuthenticatedServicosRoute
   AuthenticatedVeiculosRoute: typeof AuthenticatedVeiculosRoute
   AuthenticatedAtendimentoNovoRoute: typeof AuthenticatedAtendimentoNovoRoute
+  AuthenticatedFinanceiroPagamentosRoute: typeof AuthenticatedFinanceiroPagamentosRoute
   AuthenticatedOsIdRoute: typeof AuthenticatedOsIdRoute
 }
 
@@ -324,6 +345,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedServicosRoute: AuthenticatedServicosRoute,
   AuthenticatedVeiculosRoute: AuthenticatedVeiculosRoute,
   AuthenticatedAtendimentoNovoRoute: AuthenticatedAtendimentoNovoRoute,
+  AuthenticatedFinanceiroPagamentosRoute:
+    AuthenticatedFinanceiroPagamentosRoute,
   AuthenticatedOsIdRoute: AuthenticatedOsIdRoute,
 }
 

@@ -4,6 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   dashboardStats,
   getMembership,
+  listTenantPayments,
   loadOrder,
   ordersThisMonth,
   recognizePlateFromImage,
@@ -26,6 +27,7 @@ import {
   demoFinancialSummary,
   demoGetPixSettings,
   demoGetOrder,
+  demoListPayments,
   demoListVehicles,
   demoOrdersThisMonth,
   demoHomeSummary,
@@ -1191,4 +1193,28 @@ export const adminUpdateSubscription = createServerFn({ method: "POST" })
       .single();
     if (updateError) throw new Error("Não foi possível atualizar o plano.");
     return updated;
+  });
+
+const MAX_PAYMENT_RANGE_DAYS = 400;
+
+/** Pagamentos de um intervalo, com OS, placa, cliente e serviços (financeiro). */
+export const listPayments = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { from: string; to: string }) => data)
+  .handler(async ({ data, context }) => {
+    const from = new Date(data.from);
+    const to = new Date(data.to);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from >= to) {
+      throw new Error("Período inválido.");
+    }
+    if ((to.getTime() - from.getTime()) / 86_400_000 > MAX_PAYMENT_RANGE_DAYS) {
+      throw new Error(`Escolha um período de até ${MAX_PAYMENT_RANGE_DAYS} dias.`);
+    }
+    if (isDemoServerMode()) {
+      assertDemoFeature("financeiro");
+      return demoListPayments(from.toISOString(), to.toISOString());
+    }
+    const { tenantId } = await requireManager(context.supabase, context.userId);
+    await requireFeature(context.supabase, tenantId, "financeiro");
+    return listTenantPayments(context.supabase, tenantId, from.toISOString(), to.toISOString());
   });

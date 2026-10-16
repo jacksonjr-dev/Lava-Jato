@@ -6,6 +6,7 @@ import { assertOrderTransition } from "./order-flow";
 import { calculateFinancialStats, financialPeriod } from "./financial";
 import { assertCompatibleServices } from "./service-selection";
 import type { BusinessHours } from "./business-hours";
+import type { PaymentRow } from "./finance-analytics";
 import { FREE_MONTHLY_ORDER_LIMIT, TRIAL_DAYS, resolveSubscription, type PlanId } from "./plans";
 
 type OrderStatus = Database["public"]["Enums"]["order_status"];
@@ -532,6 +533,148 @@ const orders = new Map<string, DemoOrder>([
   ],
 ]);
 
+// Histórico fictício (~45 dias) para o financeiro e os filtros terem volume.
+// Gerado de forma determinística: é igual a cada vez que o servidor sobe.
+const HISTORY_CUSTOMERS: Array<[string, string, string, string, string, string]> = [
+  ["Ana Beatriz Rocha", "(85) 98111-2233", "PNE4A12", "Fiat", "Argo", "Branco"],
+  ["João Pedro Alves", "(85) 98222-3344", "HQK7C45", "Volkswagen", "T-Cross", "Cinza"],
+  ["Fernanda Castro", "(85) 98333-4455", "OSD2B88", "Hyundai", "HB20", "Vermelho"],
+  ["Ricardo Nogueira", "(85) 98444-5566", "RTA9F31", "Jeep", "Compass", "Preto"],
+  ["Luciana Martins", "(85) 98555-6677", "QWE3G07", "Chevrolet", "Onix", "Prata"],
+  ["Ângela Ribeiro", "(85) 98666-7788", "MNB5H66", "Renault", "Duster", "Branco"],
+];
+
+function seededRandom(seed: number) {
+  return () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+(function seedDemoHistory() {
+  const random = seededRandom(2026);
+  const pick = <T>(options: Array<[T, number]>): T => {
+    let roll = random() * options.reduce((sum, [, weight]) => sum + weight, 0);
+    for (const [value, weight] of options) {
+      roll -= weight;
+      if (roll <= 0) return value;
+    }
+    return options[0]![0];
+  };
+  const historyVehicles: DemoVehicle[] = HISTORY_CUSTOMERS.map(
+    ([nome, telefone, placa, marca, modelo, cor], index) => {
+      const customer = { id: `customer-hist-${index}`, nome, telefone, email: null };
+      const vehicle: DemoVehicle = {
+        id: `vehicle-hist-${index}`,
+        tenant_id: tenantId,
+        customer_id: customer.id,
+        placa,
+        placa_normalizada: placa,
+        marca,
+        modelo,
+        cor,
+        ano: 2020 + (index % 5),
+        customers: customer,
+        created_at: daysAgo(60, 9),
+        updated_at: daysAgo(60, 9),
+      };
+      vehicles.set(placa, vehicle);
+      return vehicle;
+    },
+  );
+  const allVehicles = [...historyVehicles, ...vehicles.values()].filter(
+    (vehicle, index, list) => list.findIndex((v) => v.id === vehicle.id) === index,
+  );
+
+  let numero = 1;
+  for (let day = 45; day >= 1 && numero < 87; day--) {
+    const weekday = new Date(daysAgo(day, 12)).getDay();
+    const count = Math.floor(random() * 3) + (weekday === 6 ? 2 : weekday === 0 ? 0 : 1);
+    for (let i = 0; i < count && numero < 87; i++) {
+      const vehicle = allVehicles[Math.floor(random() * allVehicles.length)]!;
+      const items: DemoOrderItem[] = [];
+      const wash = pick<[string, number]>([
+        [["Lavagem simples (apenas externa)", 35], 55],
+        [["Lavagem completa (externa e interna)", 60], 45],
+      ]);
+      items.push({ id: `hist-${numero}-1`, nome: wash[0], preco: wash[1], quantidade: 1 });
+      if (random() < 0.35) {
+        const extra = pick<[string, number]>([
+          [["Polimento", 150], 30],
+          [["Higienização de bancos", 95], 40],
+          [["Enceramento", 80], 30],
+        ]);
+        items.push({ id: `hist-${numero}-2`, nome: extra[0], preco: extra[1], quantidade: 1 });
+      }
+      const total = items.reduce((sum, item) => sum + item.preco, 0);
+      const hour = 8 + Math.floor(random() * 9);
+      const id = `order-hist-${String(numero).padStart(3, "0")}`;
+      orders.set(id, {
+        id,
+        tenant_id: tenantId,
+        numero,
+        status: "ENTREGUE" as OrderStatus,
+        subtotal: total,
+        desconto: 0,
+        acrescimo: 0,
+        total,
+        created_at: daysAgo(day, hour),
+        finished_at: daysAgo(day, hour + 1),
+        observacoes: null,
+        customers: vehicle.customers,
+        vehicles: vehicle,
+        service_order_items: items,
+        payments: [
+          {
+            id: `payment-hist-${numero}`,
+            metodo: pick<PaymentMethod>([
+              ["PIX", 50],
+              ["CREDITO", 20],
+              ["DEBITO", 20],
+              ["DINHEIRO", 10],
+            ]),
+            valor: total,
+            pago_em: daysAgo(day, hour + 1),
+          },
+        ],
+        order_photos: [],
+      });
+      numero++;
+    }
+  }
+})();
+
+/** Pagamentos do intervalo [from, to), no mesmo formato da consulta real. */
+export function demoListPayments(from: string, to: string): PaymentRow[] {
+  const start = Date.parse(from);
+  const end = Date.parse(to);
+  return [...orders.values()]
+    .flatMap((order) =>
+      order.payments.map((payment) => ({
+        id: payment.id,
+        valor: Number(payment.valor),
+        metodo: payment.metodo,
+        pago_em: payment.pago_em,
+        orderId: order.id,
+        numero: order.numero,
+        placa: order.vehicles.placa,
+        cliente: order.customers?.nome ?? null,
+        itens: order.service_order_items.map((item) => ({
+          nome: item.nome,
+          preco: Number(item.preco),
+          quantidade: item.quantidade,
+        })),
+      })),
+    )
+    .filter((payment) => {
+      const time = Date.parse(payment.pago_em);
+      return time >= start && time < end;
+    })
+    .sort((a, b) => Date.parse(b.pago_em) - Date.parse(a.pago_em));
+}
+
 export function demoSession() {
   return {
     membership: { tenantId, role: "OWNER" as const },
@@ -875,7 +1018,10 @@ export function demoCreateIntake(data: {
 
 export function demoOrdersThisMonth(): number {
   const monthStart = financialPeriod(new Date()).startMonth.getTime();
-  return [...orders.values()].filter((order) => Date.parse(order.created_at) >= monthStart).length;
+  // O histórico fictício não conta para o limite do plano Grátis no demo.
+  return [...orders.values()].filter(
+    (order) => !order.id.startsWith("order-hist-") && Date.parse(order.created_at) >= monthStart,
+  ).length;
 }
 
 export function demoAdminTenants() {

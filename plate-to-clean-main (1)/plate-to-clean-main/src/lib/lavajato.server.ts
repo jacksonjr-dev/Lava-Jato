@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { normalizePlate } from "./plate";
 import { calculateFinancialStats, financialPeriod } from "./financial";
+import type { PaymentRow } from "./finance-analytics";
 import { assertFeature, resolveSubscription, type Feature, type Subscription } from "./plans";
 
 export type DB = SupabaseClient<Database>;
@@ -248,5 +249,48 @@ export async function dashboardStats(sb: DB, tenantId: string) {
     monthOrders: orders ?? [],
     activeOrders: activeOrders ?? 0,
     paidItems,
+  });
+}
+
+/** Pagamentos do intervalo [from, to) com a OS, a placa, o cliente e os serviços. */
+export async function listTenantPayments(
+  sb: DB,
+  tenantId: string,
+  from: string,
+  to: string,
+): Promise<PaymentRow[]> {
+  const { data, error } = await sb
+    .from("payments")
+    .select(
+      "id, valor, metodo, pago_em, order_id, service_orders(numero, vehicles(placa), customers(nome), service_order_items(nome, preco, quantidade))",
+    )
+    .eq("tenant_id", tenantId)
+    .gte("pago_em", from)
+    .lt("pago_em", to)
+    .order("pago_em", { ascending: false })
+    .limit(3000);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((payment) => {
+    const order = payment.service_orders as unknown as {
+      numero: number;
+      vehicles: { placa: string } | null;
+      customers: { nome: string } | null;
+      service_order_items: Array<{ nome: string; preco: number; quantidade: number | null }>;
+    } | null;
+    return {
+      id: payment.id,
+      valor: Number(payment.valor),
+      metodo: payment.metodo,
+      pago_em: payment.pago_em,
+      orderId: payment.order_id,
+      numero: order?.numero ?? null,
+      placa: order?.vehicles?.placa ?? null,
+      cliente: order?.customers?.nome ?? null,
+      itens: (order?.service_order_items ?? []).map((item) => ({
+        nome: item.nome,
+        preco: Number(item.preco),
+        quantidade: item.quantidade ?? 1,
+      })),
+    };
   });
 }
