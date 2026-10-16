@@ -4,11 +4,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
-  ArrowDownRight,
   ArrowUpRight,
   Banknote,
   Car,
-  CreditCard,
   FileSpreadsheet,
   FileText,
   Loader2,
@@ -19,6 +17,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import { AppShell } from "@/components/app/shell";
+import { RevenueInsights } from "@/components/app/revenue-insights";
 import { UpgradeNotice } from "@/components/app/plan-gate";
 import { useFeature } from "@/hooks/use-plan";
 import { Button } from "@/components/ui/button";
@@ -39,14 +38,6 @@ export const Route = createFileRoute("/_authenticated/financeiro")({
   }),
   component: FinancialPage,
 });
-
-const METHOD_LABEL: Record<string, string> = {
-  PIX: "PIX",
-  CREDITO: "Crédito",
-  DEBITO: "Débito",
-  DINHEIRO: "Dinheiro",
-  OUTRO: "Outro",
-};
 
 function FinancialPage() {
   const financeiroLiberado = useFeature("financeiro");
@@ -184,96 +175,21 @@ function FinancialPage() {
               />
             </section>
 
-            <section className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_0.6fr]">
-              <div className="interactive-panel border border-border bg-card p-5 md:p-6">
-                <SectionTitle index="01" title="Receita dos últimos 7 dias" />
-                <RevenueBars values={data.last7} />
-              </div>
+            <RevenueInsights />
 
-              <div className="interactive-panel border border-border bg-card p-5 md:p-6">
-                <SectionTitle index="02" title="Formas de pagamento" />
-                <div className="mt-6 divide-y divide-border/60">
-                  {data.porMetodo.map((item) => {
-                    const share =
-                      data.faturamentoMes > 0 ? (item.valor / data.faturamentoMes) * 100 : 0;
-                    return (
-                      <div key={item.metodo} className="py-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="flex items-center gap-2 text-sm">
-                            <CreditCard className="size-4 text-primary" />
-                            {METHOD_LABEL[item.metodo] ?? item.metodo}
-                          </span>
-                          <span className="font-bold tabular-nums">{brl(item.valor)}</span>
-                        </div>
-                        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-secondary">
-                          <div
-                            className="bar-grow h-full bg-brand"
-                            style={{ width: `${Math.min(100, share)}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {data.porMetodo.length === 0 && (
-                    <p className="py-6 text-sm text-muted-foreground">
-                      Nenhum pagamento registrado neste mês.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </section>
-
-            <section className="mt-6 grid gap-6 lg:grid-cols-[1fr_1fr]">
-              <div className="interactive-panel border border-border bg-card p-5 md:p-6">
-                <SectionTitle index="03" title="Serviços com maior saída" />
-                <div className="mt-5 divide-y divide-border/60">
-                  {data.topServicos.map((service, index) => (
-                    <div
-                      key={service.nome}
-                      className="grid min-w-0 grid-cols-[28px_minmax(0,1fr)] items-center gap-3 py-4 sm:grid-cols-[32px_minmax(0,1fr)_auto]"
-                    >
-                      <span className="text-xs text-muted-foreground">
-                        {String(index + 1).padStart(2, "0")}
-                      </span>
-                      <div>
-                        <p className="text-sm font-bold">{service.nome}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {service.qtd} execuções
-                        </p>
-                      </div>
-                      <p className="col-start-2 font-bold tabular-nums sm:col-start-auto">
-                        {brl(service.valor)}
-                      </p>
-                    </div>
-                  ))}
-                  {data.topServicos.length === 0 && (
-                    <p className="py-6 text-sm text-muted-foreground">
-                      Nenhum serviço registrado neste mês.
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid overflow-hidden rounded-2xl border border-border bg-card sm:grid-cols-2">
-                <OperationalNumber
-                  label="EM ANDAMENTO"
-                  value={String(data.emAndamento)}
-                  icon={<ArrowUpRight className="size-5" />}
-                />
-                <OperationalNumber
-                  label="PAGAMENTOS NO MÊS"
-                  value={String(data.pagosOuEntregues)}
-                  icon={<ArrowDownRight className="size-5" />}
-                />
-                <div className="col-span-full border-t border-border/60 p-5 md:p-6">
-                  <p className="text-xs text-muted-foreground">Leitura do mês</p>
-                  <p className="mt-4 text-sm leading-6 text-muted-foreground">
-                    “Pagos / entregues” considera apenas ordens com esses dois status no mês. As
-                    ordens em lavagem ou aguardando pagamento continuam em andamento e não entram no
-                    faturamento.
-                  </p>
-                </div>
-              </div>
+            <section className="mt-6 grid overflow-hidden rounded-2xl border border-border bg-card sm:grid-cols-2">
+              <OperationalNumber
+                label="EM ANDAMENTO"
+                value={String(data.emAndamento)}
+                hint="Ver na Operação"
+                link={{ to: "/home" }}
+              />
+              <OperationalNumber
+                label="PAGAMENTOS NO MÊS"
+                value={String(data.pagosOuEntregues)}
+                hint="Ver quem pagou"
+                link={{ to: "/financeiro/pagamentos", search: { periodo: "mes" } }}
+              />
             </section>
 
             <PixSettingsSection />
@@ -440,44 +356,30 @@ function SectionTitle({ index, title }: { index: string; title: string }) {
   );
 }
 
-function RevenueBars({ values }: { values: Array<{ dia: string; valor: number }> }) {
-  const max = Math.max(...values.map((item) => item.valor), 1);
-  return (
-    <div className="mt-6 grid h-56 grid-cols-7 items-end gap-2 border-b border-border">
-      {values.map((item) => (
-        <div key={item.dia} className="flex h-full flex-col justify-end">
-          <p className="mb-2 hidden text-center text-[10px] tabular-nums text-muted-foreground sm:block">
-            {brl(item.valor)}
-          </p>
-          <div
-            className="bar-grow w-full bg-brand"
-            style={{ height: `${Math.max(4, (item.valor / max) * 82)}%` }}
-          />
-          <p className="-mb-6 mt-2 text-center text-[10px] uppercase text-muted-foreground">
-            {item.dia}
-          </p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function OperationalNumber({
   label,
   value,
-  icon,
+  hint,
+  link,
 }: {
   label: string;
   value: string;
-  icon: React.ReactNode;
+  hint: string;
+  link: { to: "/home" } | { to: "/financeiro/pagamentos"; search: { periodo: "mes" } };
 }) {
   return (
-    <div className="border-b border-border/60 p-5 sm:border-r sm:border-b-0 md:p-6">
+    <Link
+      {...link}
+      className="group border-b border-border/60 p-5 transition-colors last:border-b-0 hover:bg-primary/5 sm:border-r sm:border-b-0 md:p-6"
+    >
       <div className="flex justify-between text-primary">
         <span className="text-[10px]">{label}</span>
-        {icon}
+        <ArrowUpRight className="size-5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
       </div>
       <p className="mt-8 text-5xl font-bold tabular-nums">{value}</p>
-    </div>
+      <p className="mt-3 text-xs font-semibold text-muted-foreground transition-colors group-hover:text-primary">
+        {hint} →
+      </p>
+    </Link>
   );
 }
