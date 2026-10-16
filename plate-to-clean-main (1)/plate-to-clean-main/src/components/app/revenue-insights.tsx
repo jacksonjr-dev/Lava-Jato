@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState, type ReactNode } from "react";
 import { AnimatePresence, m } from "motion/react";
-import { ArrowRight, TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowRight, Pin, TrendingDown, TrendingUp, X } from "lucide-react";
 import { CountUp } from "@/components/app/motion";
 import { FinancePeriodPicker, type PeriodValue } from "@/components/app/finance-period-picker";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -89,7 +89,10 @@ export function RevenueInsights() {
         />
       </div>
 
-      <Panel title="Receita por dia" hint="Toque numa barra para ver os pagamentos do dia">
+      <Panel
+        title="Receita por dia"
+        hint="Passe o mouse para ver o dia · clique na barra para fixar (clique de novo para soltar)"
+      >
         {query.isLoading ? (
           <Skeleton className="mt-5 h-56 rounded-xl" />
         ) : (
@@ -226,23 +229,31 @@ export function RevenueInsights() {
 }
 
 function DayChart({ days }: { days: DayRevenue[] }) {
-  const [selected, setSelected] = useState<string | null>(null);
+  // hovered: prévia ao passar o mouse; pinned: fixado com clique (só solta com outro clique).
+  const [hovered, setHovered] = useState<string | null>(null);
+  const [pinned, setPinned] = useState<string | null>(null);
   const max = Math.max(1, ...days.map((day) => day.receita));
   const dense = days.length > 14;
-  const active = days.find((day) => day.day === selected) ?? null;
+  const shownDay = hovered ?? pinned;
+  const active = days.find((day) => day.day === shownDay) ?? null;
+  const isPinnedShown = active !== null && active.day === pinned && hovered === null;
 
   return (
     <div className="mt-5">
-      <div className="h-6 text-xs">
-        <AnimatePresence mode="wait">
+      <div className="min-h-7 text-xs">
+        <AnimatePresence mode="wait" initial={false}>
           {active ? (
-            <m.p
+            <m.div
               key={active.day}
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="flex flex-wrap items-center gap-x-3"
+              transition={{ duration: 0.15 }}
+              className={`inline-flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-2 py-1 ${
+                isPinnedShown ? "bg-primary/10 ring-1 ring-primary/40" : ""
+              }`}
             >
+              {isPinnedShown && <Pin className="size-3.5 text-primary" aria-label="Fixado" />}
               <span className="font-semibold">
                 {WEEKDAY[active.date.getDay()]}, {active.date.toLocaleDateString("pt-BR")}
               </span>
@@ -259,13 +270,23 @@ function DayChart({ days }: { days: DayRevenue[] }) {
                   Ver pagamentos
                 </Link>
               )}
-            </m.p>
+              {isPinnedShown && (
+                <button
+                  type="button"
+                  onClick={() => setPinned(null)}
+                  aria-label="Soltar o dia fixado"
+                  className="rounded-full p-0.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                >
+                  <X className="size-3.5" />
+                </button>
+              )}
+            </m.div>
           ) : (
             <m.p
               key="hint"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="text-muted-foreground"
+              className="px-2 py-1 text-muted-foreground"
             >
               Maior dia: {brl(Math.max(0, ...days.map((day) => day.receita)))}
             </m.p>
@@ -274,27 +295,42 @@ function DayChart({ days }: { days: DayRevenue[] }) {
       </div>
       <div
         className="mt-3 flex h-48 items-end gap-[3px] sm:gap-1"
-        onMouseLeave={() => setSelected(null)}
+        onMouseLeave={() => setHovered(null)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") setPinned(null);
+        }}
       >
         {days.map((day, index) => {
-          const isActive = selected === day.day;
+          const isPinned = pinned === day.day;
+          const isHovered = hovered === day.day;
           return (
             <button
               key={day.day}
               type="button"
               aria-label={`${day.date.toLocaleDateString("pt-BR")}: ${brl(day.receita)}`}
-              onMouseEnter={() => setSelected(day.day)}
-              onFocus={() => setSelected(day.day)}
-              onClick={() => setSelected(isActive ? null : day.day)}
-              className="group flex h-full min-w-0 flex-1 flex-col items-center justify-end"
+              aria-pressed={isPinned}
+              onMouseEnter={() => setHovered(day.day)}
+              onFocus={() => setHovered(day.day)}
+              onBlur={() => setHovered(null)}
+              onClick={() => setPinned(isPinned ? null : day.day)}
+              className="group relative flex h-full min-w-0 flex-1 flex-col items-center justify-end"
             >
+              {isPinned && (
+                <m.span
+                  layoutId="pinned-day"
+                  className="absolute -top-1 size-1.5 rounded-full bg-primary"
+                  aria-hidden="true"
+                />
+              )}
               <m.span
                 className={`w-full rounded-t-md transition-colors ${
-                  isActive
-                    ? "bg-primary"
-                    : day.receita
-                      ? "bg-primary/55 group-hover:bg-primary/80"
-                      : "bg-border"
+                  isPinned
+                    ? "bg-primary shadow-glow"
+                    : isHovered
+                      ? "bg-primary/85"
+                      : day.receita
+                        ? "bg-primary/50"
+                        : "bg-border"
                 }`}
                 initial={{ height: 0 }}
                 animate={{ height: `${Math.max(2, (day.receita / max) * 100)}%` }}
@@ -308,10 +344,12 @@ function DayChart({ days }: { days: DayRevenue[] }) {
         {days.map((day, index) => (
           <span
             key={day.day}
-            className="min-w-0 flex-1 truncate text-center text-[9px] text-muted-foreground"
+            className={`min-w-0 flex-1 truncate text-center text-[9px] ${
+              pinned === day.day ? "font-bold text-primary" : "text-muted-foreground"
+            }`}
           >
             {dense
-              ? index % Math.ceil(days.length / 8) === 0
+              ? index % Math.ceil(days.length / 8) === 0 || pinned === day.day
                 ? day.date.getDate()
                 : ""
               : WEEKDAY[day.date.getDay()]}
