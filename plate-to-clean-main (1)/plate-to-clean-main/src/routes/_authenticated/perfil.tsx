@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/shell";
+import { LogoUploader } from "@/components/app/logo-uploader";
 import { WashMark } from "@/components/app/wash-brand";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -74,7 +75,6 @@ function BusinessProfile() {
           telefone,
           endereco,
           business_hours: businessHours,
-          logo_url: logoUrl,
           public_listing: publicListing,
         },
       }),
@@ -195,15 +195,16 @@ function BusinessProfile() {
                   placeholder="Rua, número, bairro e cidade"
                 />
               </Field>
-              <Field className="sm:col-span-2" label="Link do logo" htmlFor="profile-logo">
-                <Input
-                  id="profile-logo"
-                  type="url"
-                  value={logoUrl}
-                  onChange={(e) => setLogoUrl(e.target.value)}
-                  placeholder="https://..."
+              <div className="sm:col-span-2">
+                <LogoUploader
+                  logoUrl={logoUrl}
+                  name={nome}
+                  onChange={async (next) => {
+                    setLogoUrl(next ?? "");
+                    await queryClient.invalidateQueries({ queryKey: ["session"] });
+                  }}
                 />
-              </Field>
+              </div>
             </div>
 
             <section

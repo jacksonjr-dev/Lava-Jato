@@ -43,11 +43,10 @@ function Onboarding() {
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
   const [endereco, setEndereco] = useState("");
-  const [logoUrl, setLogoUrl] = useState("");
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const result = await create({ data: { nome, telefone, endereco, logo_url: logoUrl } });
+      const result = await create({ data: { nome, telefone, endereco } });
       if (demoOnboardingPending) {
         completeDemoBusinessRegistration({
           slug: nome
@@ -59,7 +58,7 @@ function Onboarding() {
           nome: nome.trim(),
           telefone: telefone.trim(),
           endereco: endereco.trim(),
-          logo_url: logoUrl.trim() || null,
+          logo_url: null,
         });
       }
       return result;
@@ -108,10 +107,6 @@ function Onboarding() {
         <div className="space-y-2">
           <Label htmlFor="end">Endereço (opcional)</Label>
           <Input id="end" value={endereco} onChange={(e) => setEndereco(e.target.value)} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="logo">Link do logo (opcional)</Label>
-          <Input id="logo" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} />
         </div>
         <Button
           type="submit"
