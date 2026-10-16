@@ -161,7 +161,13 @@ export const searchPublicTenants = createServerFn({ method: "GET" })
     return (tenants ?? [])
       .filter((tenant) => hasFeature(resolveSubscription(tenant), "area_cliente"))
       .slice(0, 12)
-      .map(({ id, slug, nome, endereco, logo_url }) => ({ id, slug, nome, endereco, logo_url }));
+      .map((tenant) => ({
+        id: tenant.id,
+        slug: tenant.slug,
+        nome: tenant.nome,
+        endereco: tenant.endereco,
+        logo_url: hasFeature(resolveSubscription(tenant), "logo") ? tenant.logo_url : null,
+      }));
   });
 
 export const clientPortalLogin = createServerFn({ method: "POST" })
@@ -198,7 +204,7 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
             telefone: portal.tenant.telefone,
             endereco: portal.tenant.endereco,
             horario: portal.tenant.horario,
-            logo_url: portal.tenant.logo_url,
+            logo_url: hasFeature(subscription, "logo") ? portal.tenant.logo_url : null,
             business_hours: portal.tenant.business_hours,
           },
           pix: hasFeature(subscription, "pix")
@@ -250,7 +256,7 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
               telefone: portal.tenant.telefone,
               endereco: portal.tenant.endereco,
               horario: portal.tenant.horario,
-              logo_url: portal.tenant.logo_url,
+              logo_url: hasFeature(subscription, "logo") ? portal.tenant.logo_url : null,
               business_hours: portal.tenant.business_hours,
             },
             pix: hasFeature(subscription, "pix")
@@ -338,7 +344,7 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
             telefone: tenant.telefone,
             endereco: tenant.endereco,
             horario: tenant.horario,
-            logo_url: tenant.logo_url,
+            logo_url: hasFeature(subscription, "logo") ? tenant.logo_url : null,
             business_hours: tenant.business_hours,
           }
         : null,
@@ -1234,9 +1240,13 @@ export const setTenantLogo = createServerFn({ method: "POST" })
   .validator((data: { image: string | null }) => data)
   .handler(async ({ data, context }) => {
     const logo = data.image === null ? null : parseLogoDataUrl(String(data.image));
-    if (isDemoServerMode()) return demoSetLogo(logo ? String(data.image) : null);
+    if (isDemoServerMode()) {
+      if (logo) assertDemoFeature("logo");
+      return demoSetLogo(logo ? String(data.image) : null);
+    }
 
     const { tenantId } = await requireManager(context.supabase, context.userId);
+    if (logo) await requireFeature(context.supabase, tenantId, "logo");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const bucket = supabaseAdmin.storage.from("logos");
     let logoUrl: string | null = null;
