@@ -1,13 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { ArrowLeft, History, Loader2 } from "lucide-react";
 import { PLANS } from "@core/lib/plans";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { expiryText, formatDate, SubscriptionBadge } from "@/components/app/subscription-badge";
+import { NotesCard, PaymentsCard } from "@/components/app/company-billing";
+import { Card, Choice, Field, Line, textareaClass } from "@/components/app/panel";
 import { changeSubscription, getCompany } from "@/lib/admin.functions";
 import {
   describeEvent,
@@ -78,6 +80,11 @@ function CompanyPage() {
               />
               <Line label="Atendimentos no total" value={String(company.ordersTotal)} />
             </Card>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+            <PaymentsCard company={company} />
+            <NotesCard company={company} />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
@@ -154,6 +161,7 @@ function PlanActions({ company }: { company: CompanyDetail }) {
     onSuccess: (updated) => {
       queryClient.setQueryData(["company", company.id], updated);
       void queryClient.invalidateQueries({ queryKey: ["companies"] });
+      void queryClient.invalidateQueries({ queryKey: ["metrics"] });
       setReason("");
       toast.success("Plano atualizado e registrado no histórico.");
     },
@@ -212,7 +220,7 @@ function PlanActions({ company }: { company: CompanyDetail }) {
           maxLength={300}
           rows={2}
           placeholder="Ex.: pagou 3 meses no PIX em 16/10"
-          className="w-full rounded-xl border border-border bg-background p-3 text-sm outline-none focus:border-primary"
+          className={textareaClass}
         />
       </label>
 
@@ -225,66 +233,5 @@ function PlanActions({ company }: { company: CompanyDetail }) {
         {mutation.isPending ? <Loader2 className="size-4 animate-spin" /> : "Confirmar alteração"}
       </Button>
     </Card>
-  );
-}
-
-function Card({ title, icon, children }: { title: string; icon?: ReactNode; children: ReactNode }) {
-  return (
-    <section className="space-y-3 rounded-2xl border border-border bg-card p-5">
-      <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {icon}
-        {title}
-      </h2>
-      {children}
-    </section>
-  );
-}
-
-function Line({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="truncate text-right font-medium">{value}</span>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div>
-      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        {label}
-      </p>
-      <div className="flex flex-wrap gap-1.5">{children}</div>
-    </div>
-  );
-}
-
-function Choice({
-  active,
-  onClick,
-  danger,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  danger?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={`h-8 rounded-full border px-3 text-xs font-semibold transition-colors ${
-        active
-          ? danger
-            ? "border-destructive bg-destructive text-destructive-foreground"
-            : "border-primary bg-primary text-primary-foreground"
-          : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
-      }`}
-    >
-      {children}
-    </button>
   );
 }

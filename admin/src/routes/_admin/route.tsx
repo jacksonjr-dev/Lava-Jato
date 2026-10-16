@@ -1,6 +1,7 @@
 import { createFileRoute, Link, Outlet, redirect, useNavigate } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Building2, LogOut } from "lucide-react";
+import { Building2, LayoutDashboard, LogOut } from "lucide-react";
 import { WashMark } from "@/components/app/wash-brand";
 import { supabase } from "@/integrations/supabase/client";
 import { DEMO_SESSION_KEY, isAdminDemo } from "@/lib/demo-flag";
@@ -38,24 +39,22 @@ function AdminLayout() {
     <div className="flex min-h-dvh flex-col bg-hero">
       <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4 md:px-6">
-          <Link to="/empresas" className="flex items-center gap-2">
+          <Link to="/visao-geral" className="flex shrink-0 items-center gap-2">
             <WashMark className="size-7 text-primary" />
-            <span className="plate text-xs text-primary">LAVAPRO ADMIN</span>
+            <span className="plate hidden text-xs text-primary sm:inline">LAVAPRO ADMIN</span>
           </Link>
           {isAdminDemo() && (
-            <span className="rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-[10px] font-bold text-warning">
+            <span className="hidden rounded-full border border-warning/40 sm:inline bg-warning/10 px-2 py-0.5 text-[10px] font-bold text-warning">
               DEMONSTRAÇÃO
             </span>
           )}
-          <nav className="ml-4 hidden items-center gap-1 sm:flex">
-            <Link
-              to="/empresas"
-              activeProps={{ className: "bg-secondary text-foreground" }}
-              inactiveProps={{ className: "text-muted-foreground" }}
-              className="flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold"
-            >
-              <Building2 className="size-4" /> Empresas
-            </Link>
+          <nav className="flex items-center gap-1 sm:ml-4">
+            <NavLink to="/visao-geral" icon={<LayoutDashboard className="size-4" />}>
+              Visão geral
+            </NavLink>
+            <NavLink to="/empresas" icon={<Building2 className="size-4" />}>
+              Empresas
+            </NavLink>
           </nav>
           <div className="ml-auto flex items-center gap-3">
             <span className="hidden truncate text-xs text-muted-foreground md:inline">{email}</span>
@@ -64,7 +63,7 @@ function AdminLayout() {
               onClick={() => void signOut()}
               className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
             >
-              <LogOut className="size-3.5" /> Sair
+              <LogOut className="size-3.5" /> <span className="hidden sm:inline">Sair</span>
             </button>
           </div>
         </div>
@@ -73,5 +72,27 @@ function AdminLayout() {
         <Outlet />
       </main>
     </div>
+  );
+}
+
+function NavLink({
+  to,
+  icon,
+  children,
+}: {
+  to: "/visao-geral" | "/empresas";
+  icon: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <Link
+      to={to}
+      activeProps={{ className: "bg-secondary text-foreground" }}
+      inactiveProps={{ className: "text-muted-foreground" }}
+      className="flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold"
+    >
+      {icon}
+      {children}
+    </Link>
   );
 }

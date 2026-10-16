@@ -7,6 +7,7 @@ import {
   type Subscription,
   type SubscriptionFields,
 } from "@core/lib/plans";
+import type { NoteRecord, PaymentRecord } from "./billing";
 
 /** Empresa (lava-jato) como o painel enxerga: dados, dono e uso do mês. */
 export type CompanyRow = {
@@ -41,6 +42,8 @@ export type CompanyDetail = Company & {
   members: number;
   ordersTotal: number;
   events: SubscriptionEvent[];
+  payments: PaymentRecord[];
+  notes: NoteRecord[];
 };
 
 export function withSubscription<T extends SubscriptionFields>(row: T, now = new Date()) {

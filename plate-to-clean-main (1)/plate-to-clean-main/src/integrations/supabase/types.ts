@@ -471,6 +471,33 @@ export type Database = {
           },
         ];
       };
+      tenant_notes: {
+        Row: {
+          admin_email: string | null;
+          admin_user_id: string | null;
+          body: string;
+          created_at: string;
+          id: string;
+          tenant_id: string;
+        };
+        Insert: {
+          admin_email?: string | null;
+          admin_user_id?: string | null;
+          body: string;
+          created_at?: string;
+          id?: string;
+          tenant_id: string;
+        };
+        Update: {
+          admin_email?: string | null;
+          admin_user_id?: string | null;
+          body?: string;
+          created_at?: string;
+          id?: string;
+          tenant_id?: string;
+        };
+        Relationships: [];
+      };
       tenant_members: {
         Row: {
           created_at: string;
@@ -502,6 +529,48 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      subscription_payments: {
+        Row: {
+          admin_email: string | null;
+          admin_user_id: string | null;
+          amount: number;
+          created_at: string;
+          id: string;
+          method: string;
+          months: number | null;
+          note: string | null;
+          paid_at: string;
+          plan: string | null;
+          tenant_id: string;
+        };
+        Insert: {
+          admin_email?: string | null;
+          admin_user_id?: string | null;
+          amount: number;
+          created_at?: string;
+          id?: string;
+          method: string;
+          months?: number | null;
+          note?: string | null;
+          paid_at: string;
+          plan?: string | null;
+          tenant_id: string;
+        };
+        Update: {
+          admin_email?: string | null;
+          admin_user_id?: string | null;
+          amount?: number;
+          created_at?: string;
+          id?: string;
+          method?: string;
+          months?: number | null;
+          note?: string | null;
+          paid_at?: string;
+          plan?: string | null;
+          tenant_id?: string;
+        };
+        Relationships: [];
       };
       subscription_events: {
         Row: {

@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireAdmin } from "@/integrations/supabase/auth";
+import { PAYMENT_METHODS, type PaymentInput } from "./billing";
 import { withSubscription, type PanelAction } from "./companies";
 
 const isDemo = () => process.env["ADMIN_DEMO_MODE"] === "true";
@@ -66,4 +67,63 @@ export const changeSubscription = createServerFn({ method: "POST" })
           data.reason,
           context,
         ),
+  );
+
+export const getMetrics = createServerFn({ method: "GET" })
+  .middleware([requireAdmin])
+  .handler(async () =>
+    isDemo()
+      ? (await import("./demo.server")).demoGetMetrics()
+      : (await import("./admin.server")).getMetrics(),
+  );
+
+function validActivation(activate: NonNullable<PaymentInput["activate"]>) {
+  const action = validAction({ action: "ATIVAR", plan: activate.plan, months: activate.months });
+  if (action.action !== "ATIVAR") throw new Error("Ação inválida.");
+  return { plan: action.plan, months: action.months };
+}
+
+/** Só confere a forma da entrada; as regras de negócio ficam em validatePayment. */
+function validPaymentInput(input: PaymentInput): PaymentInput {
+  const activate = input?.activate;
+  if (
+    !input ||
+    typeof input.amount !== "number" ||
+    !(PAYMENT_METHODS as readonly string[]).includes(input.method) ||
+    typeof input.paidOn !== "string" ||
+    typeof input.note !== "string"
+  ) {
+    throw new Error("Pagamento inválido.");
+  }
+  return {
+    amount: input.amount,
+    method: input.method,
+    paidOn: input.paidOn,
+    note: input.note.slice(0, 300),
+    activate: activate ? validActivation(activate) : null,
+  };
+}
+
+export const recordPayment = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .validator((data: { id: string; payment: PaymentInput }) => ({
+    id: validId(data?.id),
+    payment: validPaymentInput(data?.payment),
+  }))
+  .handler(async ({ data, context }) =>
+    isDemo()
+      ? (await import("./demo.server")).demoRecordPayment(data.id, data.payment)
+      : (await import("./admin.server")).recordPayment(data.id, data.payment, context),
+  );
+
+export const addNote = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .validator((data: { id: string; body: string }) => ({
+    id: validId(data?.id),
+    body: String(data?.body ?? "").slice(0, 1000),
+  }))
+  .handler(async ({ data, context }) =>
+    isDemo()
+      ? (await import("./demo.server")).demoAddNote(data.id, data.body)
+      : (await import("./admin.server")).addNote(data.id, data.body, context),
   );
