@@ -1,3 +1,4 @@
+import { TRIAL_DAYS } from "@core/lib/plans";
 import { isExpiringSoon, type Company } from "./companies";
 
 export const PAYMENT_METHODS = [
@@ -136,7 +137,7 @@ export type BusinessMetrics = {
 /**
  * Números para a visão geral.
  * - MRR: soma, para cada empresa pagante, do último pagamento dividido pelos meses pagos.
- * - Conversão: empresas criadas há 7 a 90 dias (teste já terminou) que já pagaram ou
+ * - Conversão: empresas criadas há TRIAL_DAYS a 90 dias (teste já terminou) que já pagaram ou
  *   tiveram plano ativado, sobre o total dessas empresas.
  */
 export function businessMetrics(
@@ -174,7 +175,7 @@ export function businessMetrics(
   const day = 86_400_000;
   const cohort = companies.filter((company) => {
     const age = now.getTime() - new Date(company.created_at).getTime();
-    return age >= 7 * day && age <= 90 * day;
+    return age >= TRIAL_DAYS * day && age <= 90 * day;
   });
   const paidTenants = new Set(payments.map((payment) => payment.tenant_id));
   const converted = cohort.filter(

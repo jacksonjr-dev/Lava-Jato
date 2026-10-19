@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { TRIAL_DAYS } from "@core/lib/plans";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -65,7 +66,7 @@ function OverviewPage() {
             <Stat
               label="Em teste agora"
               value={String(metrics.testesAtivos)}
-              hint="Testes de 7 dias do Max em andamento"
+              hint={`Testes de ${TRIAL_DAYS} dias do Max em andamento`}
               to="TESTE"
             />
             <Stat

@@ -20,6 +20,7 @@ import {
 import { getDemoOwnerLoginHint, verifyOwnerBusiness } from "@/lib/lavajato.functions";
 import { WashBrand, WashMark } from "@/components/app/wash-brand";
 import { WashHoseBackdrop } from "@/components/app/wash-hose-backdrop";
+import { TRIAL_DAYS } from "@/lib/plans";
 import { AnimatePresence, m } from "motion/react";
 
 export const Route = createFileRoute("/auth")({
@@ -176,7 +177,7 @@ function AuthPage() {
               <p className="mt-1 text-sm text-muted-foreground">
                 {mode === "login"
                   ? "Acesse o painel do seu lava-jato."
-                  : "Crie sua conta e ganhe 7 dias do plano Max."}
+                  : `Crie sua conta e ganhe ${TRIAL_DAYS} dias do plano Max.`}
               </p>
 
               <form onSubmit={submit} className="mt-8 space-y-4">

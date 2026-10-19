@@ -21,7 +21,7 @@ export const FEATURES = [
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
-export const TRIAL_DAYS = 7;
+export const TRIAL_DAYS = 3;
 export const GRACE_DAYS = 3;
 export const FREE_MONTHLY_ORDER_LIMIT = 30;
 

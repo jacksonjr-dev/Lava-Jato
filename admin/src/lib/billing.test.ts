@@ -86,7 +86,7 @@ describe("números do negócio", () => {
     company("a", { plan: "MAX", plan_expires_at: day(20) }),
     company("b", { plan: "BASICO", plan_expires_at: day(60), created_at: day(-30) }),
     company("c", { plan: "MAX", plan_expires_at: day(10) }), // pagante sem pagamento registrado
-    company("d", { trial_ends_at: day(3), created_at: day(-4) }), // em teste (fora da coorte)
+    company("d", { trial_ends_at: day(1), created_at: day(-2) }), // em teste (fora da coorte)
     company("e", { created_at: day(-20) }), // terminou o teste e não pagou
   ];
   const payments = [

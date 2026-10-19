@@ -112,10 +112,15 @@ describe("sincronia com o banco", () => {
       resolve("supabase/migrations/20261015140000_subscription_plans.sql"),
       "utf8",
     );
-    expect(migration).toContain(`now() + interval '${TRIAL_DAYS} days'`);
     expect(migration).toContain(`plan_expires_at + interval '${GRACE_DAYS} days'`);
     expect(migration).toContain(`IF used >= ${FREE_MONTHLY_ORDER_LIMIT} THEN`);
     expect(migration).toContain("PERFORM app.assert_order_quota(tenant);");
+    // O prazo do teste foi alterado depois; vale a migration mais recente.
+    const trial = readFileSync(
+      resolve("supabase/migrations/20261019120000_trial_3_dias.sql"),
+      "utf8",
+    );
+    expect(trial).toContain(`SET DEFAULT (now() + interval '${TRIAL_DAYS} days')`);
   });
 });
 
