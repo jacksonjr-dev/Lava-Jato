@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isReadyTransition,
+  pushErrorMessage,
   readyMessage,
   validatePushSubscription,
 } from "./customer-notifications";
@@ -65,5 +66,23 @@ describe("mensagem de carro pronto", () => {
     expect(isReadyTransition("AGUARDANDO_PAGAMENTO")).toBe(true);
     expect(isReadyTransition("EM_LAVAGEM")).toBe(false);
     expect(isReadyTransition("ENTREGUE")).toBe(false);
+  });
+});
+
+describe("erro ao ativar o aviso", () => {
+  it("explica em português o erro do navegador", () => {
+    const pushDown = new DOMException(
+      "Registration failed - push service not available",
+      "AbortError",
+    );
+    expect(pushErrorMessage(pushDown)).toContain("Brave");
+    expect(pushErrorMessage(new DOMException("denied", "NotAllowedError"))).toContain("bloqueadas");
+    expect(pushErrorMessage(new DOMException("x", "InvalidStateError"))).toContain("Chrome");
+  });
+
+  it("mantém a mensagem do servidor", () => {
+    expect(pushErrorMessage(new Error("Acesso do cliente expirado."))).toBe(
+      "Acesso do cliente expirado.",
+    );
   });
 });

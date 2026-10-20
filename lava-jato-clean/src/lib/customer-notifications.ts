@@ -75,3 +75,27 @@ export function readyMessage(info: {
 export function isReadyTransition(status: string): boolean {
   return status === "AGUARDANDO_PAGAMENTO" || status === "FINALIZADO";
 }
+
+/**
+ * Traduz o erro do navegador ao ativar o aviso. Erros do próprio navegador
+ * (DOMException) chegam em inglês e sem orientação; os do servidor já vêm em
+ * português e são mantidos.
+ */
+export function pushErrorMessage(error: unknown): string {
+  const name = error instanceof DOMException ? error.name : "";
+  const message = error instanceof Error ? error.message : "";
+  if (name === "AbortError" || /push service/i.test(message)) {
+    return (
+      "Este navegador não conseguiu falar com o serviço de notificações. No Brave, ative " +
+      "“Usar serviços do Google para mensagens push” em Configurações > Privacidade. Em rede " +
+      "de empresa esse acesso pode estar bloqueado: tente pelo 4G ou no Chrome, Edge ou Firefox."
+    );
+  }
+  if (name === "NotAllowedError") {
+    return "As notificações estão bloqueadas para este site. Libere nas configurações do navegador.";
+  }
+  if (name || !message) {
+    return "Não foi possível ativar o aviso neste navegador. Tente no Chrome, Edge ou Firefox.";
+  }
+  return message;
+}

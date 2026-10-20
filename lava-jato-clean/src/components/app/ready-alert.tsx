@@ -1,6 +1,7 @@
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { Bell, BellOff, BellRing, Loader2, Share } from "lucide-react";
+import { pushErrorMessage } from "@/lib/customer-notifications";
 import {
   portalPushKey,
   subscribePortalPush,
@@ -116,7 +117,7 @@ export function ReadyAlert({ accessToken, vehicleId }: { accessToken: string; ve
       setState("on");
     } catch (cause) {
       console.error("[aviso no celular]", cause);
-      setError(cause instanceof Error ? cause.message : "Não foi possível ativar o aviso.");
+      setError(pushErrorMessage(cause));
       setState("off");
     }
   }
