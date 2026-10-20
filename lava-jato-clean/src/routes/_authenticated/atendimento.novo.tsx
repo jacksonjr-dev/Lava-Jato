@@ -15,7 +15,6 @@ import {
   Phone,
   Sparkles,
   UserPlus,
-  X,
 } from "lucide-react";
 import { AppShell } from "@/components/app/shell";
 import { CountUp } from "@/components/app/motion";
@@ -30,22 +29,20 @@ import {
   createNewCustomerOrder,
   findVehicleByPlate,
   listServices,
+  recognizePlate,
 } from "@/lib/lavajato.functions";
 import { brl, dateBR, normalizePlate } from "@/lib/plate";
 import { preloadPlateOcr, readPlateWithOcr } from "@/lib/plate-ocr";
-import { assessFrameQuality, PlateReadConfirmation } from "@/lib/plate-scan";
+import { isDemoEnabled } from "@/lib/demo-auth";
 import { isWashService, toggleServiceSelection } from "@/lib/service-selection";
 
 export const Route = createFileRoute("/_authenticated/atendimento/novo")({
   head: () => ({
     meta: [
       { title: "Novo atendimento — LavaPro" },
-      { name: "description", content: "Aponte a câmera para a placa e inicie o atendimento." },
+      { name: "description", content: "Fotografe a placa e inicie o atendimento." },
       { property: "og:title", content: "Novo atendimento — LavaPro" },
-      {
-        property: "og:description",
-        content: "Aponte a câmera para a placa e inicie o atendimento.",
-      },
+      { property: "og:description", content: "Fotografe a placa e inicie o atendimento." },
     ],
   }),
   component: NovoAtendimento,
@@ -58,17 +55,16 @@ const STAGE_OF: Record<Step, number> = { plate: 0, vehicle: 1, quick: 1, service
 
 function NovoAtendimento() {
   const navigate = useNavigate();
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const leituraPorFoto = useFeature("placa_foto");
-  const [scannerOpen, setScannerOpen] = useState(false);
-  const [scannerMessage, setScannerMessage] = useState("");
-  const [stableReads, setStableReads] = useState(0);
+  const [readingPhoto, setReadingPhoto] = useState(false);
 
   // Baixa o motor de OCR enquanto a pessoa ainda está na tela da placa.
   useEffect(() => {
     if (leituraPorFoto) preloadPlateOcr();
   }, [leituraPorFoto]);
 
+  const recognizeFn = useServerFn(recognizePlate);
   const findFn = useServerFn(findVehicleByPlate);
   const servicesFn = useServerFn(listServices);
   const createOrderFn = useServerFn(createOrder);
@@ -78,6 +74,7 @@ function NovoAtendimento() {
   const [direction, setDirection] = useState(1);
   const [plate, setPlate] = useState("");
   const [confidence, setConfidence] = useState<number | null>(null);
+  const [simulated, setSimulated] = useState(false);
   const [vehicleId, setVehicleId] = useState<string | null>(null);
   const [summary, setSummary] = useState<Awaited<ReturnType<typeof findVehicleByPlate>> | null>(
     null,
@@ -85,170 +82,6 @@ function NovoAtendimento() {
   const [selected, setSelected] = useState<string[]>([]);
   const [cliente, setCliente] = useState({ nome: "", telefone: "" });
   const [veic, setVeic] = useState({ marca: "", modelo: "", cor: "" });
-
-  useEffect(() => {
-    if (!scannerOpen) return;
-
-    let cancelled = false;
-    let stream: MediaStream | null = null;
-    let timer: number | undefined;
-    const videoElement = videoRef.current;
-    const canvas = document.createElement("canvas");
-    const confirmation = new PlateReadConfirmation();
-
-    const scheduleNextFrame = (delay = 500) => {
-      timer = window.setTimeout(() => void scanFrame(), delay);
-    };
-
-    async function scanFrame() {
-      if (cancelled) return;
-      const video = videoElement;
-      if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-        setScannerMessage("Iniciando a câmera traseira…");
-        scheduleNextFrame(250);
-        return;
-      }
-
-      let frame: Blob | null = null;
-      try {
-        const sourceWidth = video.videoWidth * 0.9;
-        const sourceHeight = video.videoHeight * 0.4;
-        const sourceX = video.videoWidth * 0.05;
-        const sourceY = video.videoHeight * 0.3;
-        const scale = Math.min(1, 1400 / sourceWidth);
-        canvas.width = Math.round(sourceWidth * scale);
-        canvas.height = Math.round(sourceHeight * scale);
-        const context = canvas.getContext("2d");
-        if (!context) throw new Error("Canvas indisponível.");
-        context.drawImage(
-          video,
-          sourceX,
-          sourceY,
-          sourceWidth,
-          sourceHeight,
-          0,
-          0,
-          canvas.width,
-          canvas.height,
-        );
-        const image = context.getImageData(0, 0, canvas.width, canvas.height);
-        const quality = assessFrameQuality(image.data, canvas.width, canvas.height);
-        if (!quality.usable) {
-          confirmation.reset();
-          setStableReads(0);
-          setScannerMessage(
-            quality.reason === "dark"
-              ? "Imagem escura. Aponte para uma área mais iluminada."
-              : quality.reason === "bright"
-                ? "Imagem com reflexo ou luz forte. Mude um pouco o ângulo."
-                : "Imagem desfocada. Segure o celular firme e aguarde o foco.",
-          );
-          scheduleNextFrame();
-          return;
-        }
-        frame = await new Promise<Blob | null>((resolve) =>
-          canvas.toBlob(resolve, "image/jpeg", 0.9),
-        );
-        if (!frame) throw new Error("Não foi possível capturar um quadro da câmera.");
-      } catch (error) {
-        if (!cancelled) {
-          console.error("[scanner da placa]", error);
-          setScannerMessage("Não consegui analisar este quadro. Mantenha a placa na moldura.");
-          scheduleNextFrame();
-        }
-        return;
-      }
-
-      try {
-        const result = await readPlateWithOcr(frame, { strict: true });
-        if (cancelled) return;
-        const progress = confirmation.observe(result.plate, result.confidence);
-        setStableReads(progress.stableReads);
-
-        if (progress.confirmed) {
-          setPlate(progress.confirmed);
-          setConfidence(result.confidence);
-          setScannerOpen(false);
-          return;
-        }
-
-        setScannerMessage(
-          progress.stableReads > 0
-            ? `Confirmando ${progress.plate}: ${progress.stableReads}/3 leituras estáveis…`
-            : result.plate
-              ? "Leitura instável. Continue mantendo a placa na moldura."
-              : "Procurando a placa. Centralize, aproxime e melhore a iluminação.",
-        );
-      } catch (error) {
-        if (cancelled) return;
-        confirmation.reset();
-        setStableReads(0);
-        console.error("[OCR ao vivo]", error);
-        setScannerMessage(
-          "A leitura falhou neste quadro. Mantenha a placa visível e tente novamente.",
-        );
-      }
-
-      if (!cancelled) scheduleNextFrame();
-    }
-
-    async function startCamera() {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        setScannerMessage("Este navegador não oferece acesso à câmera. Tente em outro navegador.");
-        return;
-      }
-
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
-        });
-        if (cancelled) {
-          stream.getTracks().forEach((track) => track.stop());
-          return;
-        }
-        const video = videoElement;
-        if (!video) throw new Error("Vídeo da câmera indisponível.");
-        video.srcObject = stream;
-        await video.play();
-        if (!cancelled) {
-          setScannerMessage(
-            "Procurando a placa. Centralize na moldura e mantenha o celular firme.",
-          );
-          scheduleNextFrame(250);
-        }
-      } catch (error) {
-        if (cancelled) return;
-        stream?.getTracks().forEach((track) => track.stop());
-        stream = null;
-        if (videoElement) videoElement.srcObject = null;
-        const name = error instanceof DOMException ? error.name : "";
-        setScannerMessage(
-          name === "NotAllowedError"
-            ? "Acesso à câmera negado. Libere a câmera nas permissões do navegador e tente novamente."
-            : name === "NotFoundError"
-              ? "Nenhuma câmera foi encontrada neste dispositivo."
-              : "Não foi possível iniciar a câmera. Verifique as permissões e tente novamente.",
-        );
-      }
-    }
-
-    void startCamera();
-    return () => {
-      cancelled = true;
-      if (timer !== undefined) window.clearTimeout(timer);
-      stream?.getTracks().forEach((track) => track.stop());
-      const video = videoElement;
-      if (video) {
-        video.pause();
-        video.srcObject = null;
-      }
-    };
-  }, [scannerOpen]);
 
   function go(next: Step) {
     setDirection(STAGE_OF[next] >= STAGE_OF[step] ? 1 : -1);
@@ -263,6 +96,21 @@ function NovoAtendimento() {
   const services = useQuery({
     queryKey: ["services"],
     queryFn: () => servicesFn(),
+  });
+
+  const recognizeMutation = useMutation({
+    mutationFn: (image: string) => recognizeFn({ data: { image } }),
+    onSuccess: (res) => {
+      if (!res.plate) {
+        toast.error("Não encontrei uma placa válida na foto. Digite manualmente.");
+        setConfidence(null);
+        return;
+      }
+      setPlate(res.plate);
+      setConfidence(res.confidence);
+      setSimulated(res.simulated);
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const findMutation = useMutation({
@@ -302,6 +150,30 @@ function NovoAtendimento() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  async function onFile(file: File) {
+    setReadingPhoto(true);
+    try {
+      // 1º OCR no próprio aparelho; 2º, se configurada, a leitura por IA no servidor.
+      const ocr = await readPlateWithOcr(file);
+      if (ocr.plate) {
+        setPlate(ocr.plate);
+        setConfidence(ocr.confidence);
+        setSimulated(false);
+        return;
+      }
+      if (isDemoEnabled()) {
+        toast.error("Não encontrei uma placa válida na foto. Digite manualmente.");
+        return;
+      }
+      recognizeMutation.mutate(await plateImageDataUrl(file));
+    } catch (error) {
+      console.error("[OCR]", error);
+      toast.error("Não foi possível ler a foto. Digite a placa manualmente.");
+    } finally {
+      setReadingPhoto(false);
+    }
+  }
 
   const active = (services.data ?? []).filter((s) => s.ativo);
   const subtotal = active
@@ -343,7 +215,7 @@ function NovoAtendimento() {
                 <div className="space-y-6">
                   <StepTitle
                     title="Qual é a placa?"
-                    text="Digite a placa ou aponte a câmera. O sistema busca o cliente e o histórico."
+                    text="Digite a placa ou tire uma foto. O sistema busca o cliente e o histórico."
                   />
                   <form
                     className="flex flex-col items-center gap-3"
@@ -371,8 +243,9 @@ function NovoAtendimento() {
                           className="flex items-center gap-1.5 text-xs text-primary"
                         >
                           <Sparkles className="size-3.5" />
-                          Lida ao vivo · confiança {Math.round(confidence * 100)}%. Confira antes de
-                          seguir.
+                          {simulated
+                            ? "Leitura simulada (modo demonstração): a foto não é analisada."
+                            : `Lida pela foto · confiança ${Math.round(confidence * 100)}%. Confira antes de seguir.`}
                         </m.p>
                       )}
                     </AnimatePresence>
@@ -396,18 +269,35 @@ function NovoAtendimento() {
                     <span className="h-px flex-1 bg-border" />
                   </div>
 
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) void onFile(f);
+                      e.target.value = "";
+                    }}
+                  />
                   {leituraPorFoto ? (
                     <m.button
                       type="button"
                       whileTap={{ scale: 0.97 }}
-                      onClick={() => {
-                        setStableReads(0);
-                        setScannerMessage("Solicitando acesso à câmera traseira…");
-                        setScannerOpen(true);
-                      }}
+                      onClick={() => fileRef.current?.click()}
+                      disabled={readingPhoto || recognizeMutation.isPending}
                       className="flex h-20 w-full items-center justify-center gap-3 rounded-3xl border border-primary/40 bg-primary/10 text-sm font-bold text-primary transition-colors hover:bg-primary/15 disabled:opacity-60"
                     >
-                      <Camera className="size-6" /> LER PLACA AO VIVO
+                      {readingPhoto || recognizeMutation.isPending ? (
+                        <>
+                          <Loader2 className="size-6 animate-spin" /> LENDO A PLACA…
+                        </>
+                      ) : (
+                        <>
+                          <Camera className="size-6" /> FOTOGRAFAR A PLACA
+                        </>
+                      )}
                     </m.button>
                   ) : (
                     <Link
@@ -415,7 +305,7 @@ function NovoAtendimento() {
                       className="flex h-20 w-full flex-col items-center justify-center gap-1 rounded-3xl border border-dashed border-border text-center text-xs text-muted-foreground hover:border-primary/50 hover:text-primary"
                     >
                       <span className="flex items-center gap-2 font-bold">
-                        <Lock className="size-4" /> LEITURA DA PLACA PELA CÂMERA
+                        <Lock className="size-4" /> LEITURA DA PLACA PELA FOTO
                       </span>
                       Disponível no plano Max
                     </Link>
@@ -671,73 +561,6 @@ function NovoAtendimento() {
           </AnimatePresence>
         </div>
       </div>
-      {scannerOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="plate-scanner-title"
-          className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-5 bg-black px-4 py-6 text-white"
-        >
-          <div className="flex w-full max-w-2xl items-center justify-between gap-4">
-            <div>
-              <h2 id="plate-scanner-title" className="text-lg font-bold">
-                Leitura automática da placa
-              </h2>
-              <p className="mt-1 text-sm text-white/70">
-                Centralize a placa na moldura e mantenha o celular firme.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setScannerOpen(false)}
-              className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white/10 hover:bg-white/20"
-              aria-label="Cancelar leitura e fechar câmera"
-            >
-              <X className="size-5" />
-            </button>
-          </div>
-
-          <div className="relative aspect-video w-full max-w-2xl overflow-hidden rounded-3xl bg-neutral-900">
-            <video
-              ref={videoRef}
-              autoPlay
-              muted
-              playsInline
-              className="size-full object-cover"
-              aria-label="Imagem ao vivo da câmera traseira"
-            />
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute left-[5%] top-[34%] flex h-[32%] w-[90%] items-end justify-center rounded-2xl border-2 border-emerald-400 shadow-[0_0_0_999px_rgba(0,0,0,0.3)]"
-            >
-              <span className="mb-2 rounded-full bg-black/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-200">
-                Área de leitura
-              </span>
-            </div>
-          </div>
-
-          <div className="w-full max-w-2xl space-y-4 text-center">
-            <p aria-live="polite" className="min-h-10 text-sm text-white/90">
-              {scannerMessage || "Iniciando a câmera traseira…"}
-            </p>
-            {stableReads > 0 && (
-              <div
-                className="mx-auto flex w-fit items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-semibold"
-                aria-label={`${stableReads} de 3 leituras estáveis`}
-              >
-                <Loader2 className="size-4 animate-spin" /> {stableReads}/3 leituras estáveis
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={() => setScannerOpen(false)}
-              className="h-12 rounded-xl border border-white/30 px-6 text-sm font-bold hover:bg-white/10"
-            >
-              CANCELAR LEITURA
-            </button>
-          </div>
-        </div>
-      )}
     </AppShell>
   );
 }
@@ -808,4 +631,18 @@ function MiniStat({ label, value }: { label: string; value: string }) {
       <p className="mt-0.5 truncate text-sm font-bold">{value}</p>
     </div>
   );
+}
+
+// Reduz a foto da câmera (vários MB) para um JPEG leve antes de enviar ao servidor.
+async function plateImageDataUrl(file: File, maxSide = 1600): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Canvas indisponível.");
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  return canvas.toDataURL("image/jpeg", 0.85);
 }
