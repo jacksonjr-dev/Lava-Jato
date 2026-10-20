@@ -81,8 +81,15 @@ export function PlanPrice({ plan, months }: { plan: PlanId; months: BillingPerio
           "Cobrado todo mês"
         ) : (
           <>
-            {formatBRL(price.total)} a cada {months} meses ·{" "}
-            <span className="font-semibold text-success">economize {formatBRL(price.savings)}</span>
+            {formatBRL(price.total)} a cada {months} meses
+            {price.savings > 0 ? (
+              <>
+                {" · "}
+                <span className="font-semibold text-success">
+                  economize {formatBRL(price.savings)}
+                </span>
+              </>
+            ) : null}
           </>
         )}
       </p>

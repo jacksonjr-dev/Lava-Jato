@@ -250,7 +250,7 @@ export const BILLING_PERIODS = [1, 3, 6, 12] as const;
 export type BillingPeriod = (typeof BILLING_PERIODS)[number];
 
 /** Desconto (em %) sobre a mensalidade quando o plano é pago adiantado. */
-export const PERIOD_DISCOUNT_PERCENT: Record<BillingPeriod, number> = { 1: 0, 3: 5, 6: 10, 12: 15 };
+export const PERIOD_DISCOUNT_PERCENT: Record<BillingPeriod, number> = { 1: 0, 3: 0, 6: 10, 12: 15 };
 
 export const PERIOD_LABEL: Record<BillingPeriod, string> = {
   1: "Mensal",

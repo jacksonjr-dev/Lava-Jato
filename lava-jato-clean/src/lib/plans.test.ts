@@ -173,11 +173,12 @@ describe("desconto por período", () => {
       discount: 0.15,
       savings: 179.82,
     });
+    // Trimestral sem desconto: o desconto começa no semestral.
     expect(periodPrice("BASICO", 3)).toEqual({
-      total: 227.72,
-      perMonth: 75.91,
-      discount: 0.05,
-      savings: 11.98,
+      total: 239.7,
+      perMonth: 79.9,
+      discount: 0,
+      savings: 0,
     });
     expect(periodPrice("BASICO", 6)?.total).toBe(431.46);
     expect(periodPrice("GRATIS", 12)?.total).toBe(0);
