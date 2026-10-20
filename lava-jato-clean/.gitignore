@@ -43,3 +43,6 @@ supabase/.temp/
 
 # Motor de OCR copiado de node_modules (scripts/copy-ocr-assets.mjs)
 public/ocr/
+
+# Saída de build da Netlify (não usamos; não versionar)
+.netlify/

@@ -145,7 +145,7 @@ Sem essas variáveis, o sistema funciona; só não tem o reforço.
 
 ## 7. Publicar o site
 
-O site fica na pasta **`lava-jato-clean/`**. Hoje ele está na **Vercel** (`lava-pro.vercel.app`). A pasta também tem um `netlify.toml`: **escolham uma hospedagem só**. Se ficarem na Vercel, apaguem o `netlify.toml` e a pasta `.netlify/` do repositório.
+O site fica na pasta **`lava-jato-clean/`** e é publicado na **Vercel** (hoje em `lava-pro.vercel.app`).
 
 ### Na Vercel
 
