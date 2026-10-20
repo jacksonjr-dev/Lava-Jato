@@ -50,6 +50,7 @@ import {
 import { buildPixPayload } from "./pix";
 import { assertCompatibleServices } from "./service-selection";
 import { assertOrderTransition } from "./order-flow";
+import { isReadyTransition } from "./customer-notifications";
 import { validateBusinessHours, type BusinessHours } from "./business-hours";
 import { matchesBusinessIdentity } from "./business-identity";
 import { logoExtension, parseLogoDataUrl } from "./logo";
@@ -963,7 +964,23 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: { order_id: string; status: OrderStatus }) => data)
   .handler(async ({ data, context }) => {
-    if (isDemoServerMode()) return demoUpdateOrderStatus(data.order_id, data.status);
+    const notifications = await import("./customer-notifications.server");
+    if (isDemoServerMode()) {
+      const result = demoUpdateOrderStatus(data.order_id, data.status);
+      if (isReadyTransition(data.status)) {
+        const order = demoGetOrder(data.order_id);
+        const portal = demoClientPortalByVehicleId(order.vehicles.id);
+        await notifications.demoNotifyOrderReady({
+          vehicleId: order.vehicles.id,
+          plate: order.vehicles.placa,
+          tenantName: portal.tenant.nome,
+          orderNumber: order.numero,
+          hasPix:
+            !!portal.tenant.pix_key?.trim() && hasFeature(portalSubscription(portal.tenant), "pix"),
+        });
+      }
+      return result;
+    }
     const sb = context.supabase;
     const membership = await requireMembership(sb, context.userId);
     if (data.status === "CANCELADO" && membership.role === "EMPLOYEE") {
@@ -992,6 +1009,9 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
       .eq("id", data.order_id)
       .eq("tenant_id", membership.tenantId);
     if (error) throw new Error(error.message);
+    if (isReadyTransition(data.status)) {
+      await notifications.notifyOrderReady(membership.tenantId, data.order_id);
+    }
     return { ok: true };
   });
 
@@ -1274,4 +1294,53 @@ export const setTenantLogo = createServerFn({ method: "POST" })
       .map((file) => `${tenantId}/${file.name}`);
     if (old.length) await bucket.remove(old);
     return { logo_url: logoUrl };
+  });
+
+// ---------------------------------------------------------------------------
+// Aviso no celular do cliente ("Me avise quando ficar pronto")
+// ---------------------------------------------------------------------------
+
+/** Chave pública para o navegador criar a assinatura (null se o aviso não estiver configurado). */
+export const portalPushKey = createServerFn({ method: "GET" }).handler(async () => {
+  if (isDemoServerMode() && !process.env["VAPID_PUBLIC_KEY"]) return { publicKey: null };
+  const { pushPublicKey } = await import("./customer-notifications.server");
+  return { publicKey: pushPublicKey() };
+});
+
+export const subscribePortalPush = createServerFn({ method: "POST" })
+  .validator((data: { accessToken: string; subscription: unknown }) => ({
+    accessToken: String(data?.accessToken ?? "").slice(0, 2000),
+    subscription: data?.subscription,
+  }))
+  .handler(async ({ data }) => {
+    const security = await import("./client-portal.server");
+    const claims = security.verifyClientPortalToken(data.accessToken);
+    const notifications = await import("./customer-notifications.server");
+    if (isDemoServerMode()) {
+      notifications.demoSavePushSubscription(claims.vehicleId, data.subscription);
+    } else {
+      await notifications.savePushSubscription(
+        claims.tenantId,
+        claims.vehicleId,
+        data.subscription,
+      );
+    }
+    return { ok: true };
+  });
+
+export const unsubscribePortalPush = createServerFn({ method: "POST" })
+  .validator((data: { accessToken: string; endpoint: string }) => ({
+    accessToken: String(data?.accessToken ?? "").slice(0, 2000),
+    endpoint: String(data?.endpoint ?? "").slice(0, 1000),
+  }))
+  .handler(async ({ data }) => {
+    const security = await import("./client-portal.server");
+    const claims = security.verifyClientPortalToken(data.accessToken);
+    const notifications = await import("./customer-notifications.server");
+    if (isDemoServerMode()) {
+      notifications.demoRemovePushSubscription(claims.vehicleId, data.endpoint);
+    } else {
+      await notifications.removePushSubscription(claims.tenantId, claims.vehicleId, data.endpoint);
+    }
+    return { ok: true };
   });

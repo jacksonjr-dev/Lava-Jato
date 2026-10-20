@@ -1,0 +1,9 @@
+{
+  "name": "LavaPro",
+  "short_name": "LavaPro",
+  "description": "Acompanhe o seu carro no lava-jato.",
+  "display": "standalone",
+  "background_color": "#071019",
+  "theme_color": "#071019",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

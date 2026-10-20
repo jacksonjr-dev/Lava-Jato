@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useDeferredValue, useEffect, useState } from "react";
+import { useDeferredValue, useEffect, useState, type ReactNode } from "react";
 import {
   ArrowRight,
   Building2,
@@ -28,6 +28,7 @@ import { WashHoseBackdrop } from "@/components/app/wash-hose-backdrop";
 import { PlateBadge } from "@/components/app/plate-badge";
 import { TenantLogo } from "@/components/app/tenant-logo";
 import { OrderTimeline } from "@/components/app/order-timeline";
+import { ReadyAlert } from "@/components/app/ready-alert";
 import { Reveal } from "@/components/app/motion";
 import { m } from "motion/react";
 import {
@@ -241,7 +242,16 @@ function ClientPortal() {
           </div>
 
           {activeOrder ? (
-            <ActiveOrderCard order={activeOrder} plate={data.vehicle.placa} pix={data.pix} />
+            <ActiveOrderCard
+              order={activeOrder}
+              plate={data.vehicle.placa}
+              pix={data.pix}
+              alert={
+                accessToken ? (
+                  <ReadyAlert accessToken={accessToken} vehicleId={data.vehicle.id} />
+                ) : null
+              }
+            />
           ) : (
             <section className="mt-5 flex items-center gap-4 rounded-3xl border border-border/60 bg-card p-6 shadow-card">
               <Car className="size-8 shrink-0 text-primary" strokeWidth={1.5} />
@@ -554,10 +564,13 @@ function ActiveOrderCard({
   order,
   plate,
   pix,
+  alert,
 }: {
   order: PortalOrder;
   plate: string;
   pix: PortalPix | null;
+  /** "Me avise quando ficar pronto" (só enquanto o carro ainda não está pronto). */
+  alert: ReactNode;
 }) {
   const now = useNow();
   const status = order.status as OrderStatus;
@@ -604,6 +617,7 @@ function ActiveOrderCard({
         </div>
         <div className="p-5 md:p-7">
           <OrderTimeline status={status} title="Onde está o seu carro" />
+          {message.tom === "andamento" ? alert : null}
           {pix && (status === "FINALIZADO" || status === "AGUARDANDO_PAGAMENTO") ? (
             <PixPaymentCard pix={pix} />
           ) : null}

@@ -101,6 +101,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: appCss,
       },
       { rel: "icon", href: "/favicon.svg?v=lavapro-1", type: "image/svg+xml" },
+      // Sem start_url: adicionado à Tela de Início, abre na página de onde foi adicionado
+      // (a área do cliente). No iPhone, o aviso no celular só funciona assim.
+      { rel: "manifest", href: "/manifest.webmanifest" },
     ],
   }),
   shellComponent: RootShell,

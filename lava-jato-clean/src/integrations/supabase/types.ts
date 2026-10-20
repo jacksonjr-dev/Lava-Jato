@@ -266,6 +266,39 @@ export type Database = {
         };
         Relationships: [];
       };
+      portal_push_subscriptions: {
+        Row: {
+          auth: string;
+          created_at: string;
+          endpoint: string;
+          id: string;
+          last_sent_at: string | null;
+          p256dh: string;
+          tenant_id: string;
+          vehicle_id: string;
+        };
+        Insert: {
+          auth: string;
+          created_at?: string;
+          endpoint: string;
+          id?: string;
+          last_sent_at?: string | null;
+          p256dh: string;
+          tenant_id: string;
+          vehicle_id: string;
+        };
+        Update: {
+          auth?: string;
+          created_at?: string;
+          endpoint?: string;
+          id?: string;
+          last_sent_at?: string | null;
+          p256dh?: string;
+          tenant_id?: string;
+          vehicle_id?: string;
+        };
+        Relationships: [];
+      };
       profiles: {
         Row: {
           created_at: string;
