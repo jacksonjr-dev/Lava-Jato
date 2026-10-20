@@ -833,6 +833,12 @@ export function demoSearchPublicTenants(queryInput: string) {
   );
 }
 
+/** Link direto do lava-jato (/cliente?empresa=codigo): vale mesmo fora da lista pública. */
+export function demoPublicTenantBySlug(slugInput: string) {
+  const slug = slugInput.trim().toLowerCase();
+  return [businessSettings, ...demoPublicTenants].find((tenant) => tenant.slug === slug) ?? null;
+}
+
 export function demoClientPortal(tenantInput: string, plateInput: string, phoneInput: string) {
   if (tenantInput !== tenantId) throw new Error("Placa ou telefone não encontrados.");
   const placa = normalizePlate(plateInput);

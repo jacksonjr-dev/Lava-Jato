@@ -35,6 +35,7 @@ import {
   demoRegisterPayment,
   demoServices,
   demoSearchPublicTenants,
+  demoPublicTenantBySlug,
   demoSession,
   demoSetLogo,
   demoSubscriptionFields,
@@ -169,6 +170,52 @@ export const searchPublicTenants = createServerFn({ method: "GET" })
         endereco: tenant.endereco,
         logo_url: hasFeature(resolveSubscription(tenant), "logo") ? tenant.logo_url : null,
       }));
+  });
+
+/**
+ * Lava-jato do link direto (/cliente?empresa=codigo), que o dono compartilha ou
+ * imprime em QR Code. Vale mesmo se a empresa não aparece na busca pública.
+ */
+export const publicTenantBySlug = createServerFn({ method: "GET" })
+  .validator((data: { slug: string }) => ({
+    slug: String(data?.slug ?? "")
+      .trim()
+      .toLowerCase()
+      .slice(0, 80),
+  }))
+  .handler(async ({ data }) => {
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(data.slug)) return null;
+    if (isDemoServerMode()) {
+      const tenant = demoPublicTenantBySlug(data.slug);
+      if (!tenant) return null;
+      const portalEnabled =
+        tenant.id !== "demo-tenant" ||
+        hasFeature(resolveSubscription(demoSubscriptionFields()), "area_cliente");
+      return portalEnabled
+        ? {
+            id: tenant.id,
+            slug: tenant.slug,
+            nome: tenant.nome,
+            endereco: tenant.endereco,
+            logo_url: tenant.logo_url,
+          }
+        : null;
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: tenant, error } = await supabaseAdmin
+      .from("tenants")
+      .select("id, slug, nome, endereco, logo_url, plan, trial_ends_at, plan_expires_at")
+      .eq("slug", data.slug)
+      .maybeSingle();
+    if (error) throw new Error("Não foi possível abrir o link do lava-jato.");
+    if (!tenant || !hasFeature(resolveSubscription(tenant), "area_cliente")) return null;
+    return {
+      id: tenant.id,
+      slug: tenant.slug,
+      nome: tenant.nome,
+      endereco: tenant.endereco,
+      logo_url: hasFeature(resolveSubscription(tenant), "logo") ? tenant.logo_url : null,
+    };
   });
 
 export const clientPortalLogin = createServerFn({ method: "POST" })

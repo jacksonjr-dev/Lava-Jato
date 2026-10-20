@@ -19,7 +19,11 @@ import {
   Search,
   Wrench,
 } from "lucide-react";
-import { clientPortalLogin, searchPublicTenants } from "@/lib/lavajato.functions";
+import {
+  clientPortalLogin,
+  publicTenantBySlug,
+  searchPublicTenants,
+} from "@/lib/lavajato.functions";
 import { brl, dateBR, normalizePlate, type OrderStatus } from "@/lib/plate";
 import { portalStatusMessage, sinceText, whenText } from "@/lib/portal-status";
 import { getDemoBusiness, isDemoEnabled } from "@/lib/demo-auth";
@@ -40,6 +44,11 @@ import {
 
 export const Route = createFileRoute("/cliente")({
   ssr: false,
+  // Link direto do lava-jato: /cliente?empresa=codigo (compartilhado ou no QR Code do balcão).
+  validateSearch: (search: Record<string, unknown>): { empresa?: string } =>
+    typeof search["empresa"] === "string" && search["empresa"]
+      ? { empresa: search["empresa"].slice(0, 80) }
+      : {},
   head: () => ({
     meta: [
       { title: "Área do cliente — LavaPro" },
@@ -138,6 +147,8 @@ function ClientBusinessHours({
 function ClientPortal() {
   const login = useServerFn(clientPortalLogin);
   const searchTenants = useServerFn(searchPublicTenants);
+  const tenantBySlug = useServerFn(publicTenantBySlug);
+  const { empresa } = Route.useSearch();
   const [tenantSearch, setTenantSearch] = useState("");
   const deferredTenantSearch = useDeferredValue(tenantSearch);
   const [selectedTenant, setSelectedTenant] = useState<PublicTenant | null>(null);
@@ -164,6 +175,21 @@ function ClientPortal() {
     ...(localBusinessMatches ? [demoBusiness] : []),
     ...(tenantsQuery.data ?? []).filter((tenant) => tenant.id !== demoBusiness?.id),
   ];
+  const linkedTenant = useQuery({
+    queryKey: ["public-tenant-slug", empresa],
+    queryFn: () => tenantBySlug({ data: { slug: empresa! } }),
+    enabled: Boolean(empresa),
+    staleTime: 5 * 60_000,
+  });
+  useEffect(() => {
+    if (linkedTenant.data && !selectedTenant) {
+      setSelectedTenant(linkedTenant.data);
+      setTenantSearch(linkedTenant.data.nome);
+    }
+    // Só no primeiro carregamento do link: depois a pessoa pode trocar de empresa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedTenant.data]);
+  const invalidLink = Boolean(empresa) && linkedTenant.isSuccess && linkedTenant.data === null;
   const liveQuery = useQuery({
     queryKey: ["client-portal-live", accessToken],
     queryFn: () => login({ data: { accessToken: accessToken! } }),
@@ -385,6 +411,11 @@ function ClientPortal() {
 
             <div className="mt-7">
               <p className="text-[10px] font-bold tracking-[0.14em] text-primary">01 / LAVA-JATO</p>
+              {invalidLink && !selectedTenant ? (
+                <p className="mt-2 rounded-xl border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
+                  Este link de lava-jato não está disponível. Procure o lava-jato pelo nome abaixo.
+                </p>
+              ) : null}
               {selectedTenant ? (
                 <div className="mt-2 flex items-start gap-3 rounded-2xl border border-primary/45 bg-primary/10 p-4">
                   <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">

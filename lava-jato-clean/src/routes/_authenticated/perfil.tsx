@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/shell";
 import { LogoUploader } from "@/components/app/logo-uploader";
+import { CustomerLinkCard } from "@/components/app/customer-link-card";
 import { UpgradeNotice } from "@/components/app/plan-gate";
 import { useFeature } from "@/hooks/use-plan";
 import { WashMark } from "@/components/app/wash-brand";
@@ -59,6 +60,7 @@ function BusinessProfile() {
   const [logoUrl, setLogoUrl] = useState("");
   const [publicListing, setPublicListing] = useState(true);
   const logoLiberado = useFeature("logo");
+  const areaClienteLiberada = useFeature("area_cliente");
 
   useEffect(() => {
     if (!tenant) return;
@@ -156,6 +158,12 @@ function BusinessProfile() {
                 <Link to="/financeiro">Abrir configuração PIX</Link>
               </Button>
             </section>
+
+            {areaClienteLiberada ? (
+              <CustomerLinkCard slug={tenant.slug} name={nome || tenant.nome} />
+            ) : (
+              <UpgradeNotice feature="area_cliente" compact />
+            )}
           </aside>
 
           <form
@@ -303,7 +311,8 @@ function BusinessProfile() {
                 <div>
                   <Label htmlFor="profile-public">Aparecer na busca dos clientes</Label>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                    Quando ativo, clientes podem encontrar este lava-jato pelo nome ou código.
+                    Quando ativo, clientes podem encontrar este lava-jato pelo nome ou código. O
+                    link e o QR Code funcionam mesmo desativado.
                   </p>
                 </div>
               </div>

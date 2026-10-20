@@ -91,11 +91,12 @@ function SiteHeader() {
           ))}
         </nav>
         <div className="hidden items-center gap-2 lg:flex">
+          {/* Entrada do cliente final, separada das ações do lava-jato. */}
           <Link
             to="/cliente"
-            className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-primary"
+            className="mr-2 flex items-center gap-1.5 px-2 py-2 text-xs text-muted-foreground hover:text-primary"
           >
-            Área do cliente
+            <Car className="size-3.5" /> Acompanhar meu carro
           </Link>
           <Link
             to="/auth"
@@ -146,8 +147,11 @@ function SiteHeader() {
             <Link to="/auth" className="border border-border px-4 py-3 text-center text-sm">
               Entrar
             </Link>
-            <Link to="/cliente" className="px-4 py-2 text-center text-sm text-muted-foreground">
-              Área do cliente
+            <Link
+              to="/cliente"
+              className="mt-2 flex items-center justify-center gap-2 border-t border-border/60 px-4 pt-4 pb-1 text-center text-sm text-muted-foreground"
+            >
+              <Car className="size-4" /> Sou cliente: acompanhar meu carro
             </Link>
           </div>
         </nav>
