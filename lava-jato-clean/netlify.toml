@@ -4,3 +4,4 @@
 
 [build.environment]
   NITRO_PRESET = "netlify"
+  SECRETS_SCAN_OMIT_KEYS = "OPENAI_VISION_MODEL"
