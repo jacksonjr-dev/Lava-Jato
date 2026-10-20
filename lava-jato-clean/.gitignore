@@ -43,3 +43,6 @@ supabase/.temp/
 
 # Motor de OCR copiado de node_modules (scripts/copy-ocr-assets.mjs)
 public/ocr/
+
+# Artefatos de build gerados pelo Nitro/Netlify
+.netlify/functions-internal/
