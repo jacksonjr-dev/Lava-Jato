@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue, useEffect, useState } from "react";
 import {
   ArrowRight,
   Building2,
@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { clientPortalLogin, searchPublicTenants } from "@/lib/lavajato.functions";
 import { brl, dateBR, normalizePlate, type OrderStatus } from "@/lib/plate";
+import { portalStatusMessage, sinceText, whenText } from "@/lib/portal-status";
 import { getDemoBusiness, isDemoEnabled } from "@/lib/demo-auth";
 import { WashBrand } from "@/components/app/wash-brand";
 import { WashHoseBackdrop } from "@/components/app/wash-hose-backdrop";
@@ -182,15 +183,14 @@ function ClientPortal() {
     const activeOrder = data.orders.find(
       (order) => !["ENTREGUE", "CANCELADO"].includes(order.status),
     );
-    const activeStatus = activeOrder?.status as OrderStatus | undefined;
-    const readyForPickup = activeStatus === "FINALIZADO" || activeStatus === "AGUARDANDO_PAGAMENTO";
+    const pastOrders = data.orders.filter((order) => order.id !== activeOrder?.id);
 
     return (
       <div className="min-h-screen min-h-dvh bg-hero">
         <WashHoseBackdrop />
         <header className="wash-header border-b border-border/60 bg-background/95 px-5 py-4">
-          <div className="mx-auto flex max-w-5xl items-center justify-between">
-            <div>
+          <div className="mx-auto flex max-w-5xl items-start justify-between gap-4">
+            <div className="min-w-0">
               <WashBrand suffix="CLIENTE" />
               <p className="mt-2 flex items-center gap-2 text-sm font-semibold">
                 <TenantLogo
@@ -199,7 +199,7 @@ function ClientPortal() {
                   className="size-7"
                   fallback={<Building2 className="size-4 text-primary" />}
                 />{" "}
-                {displayedTenant?.nome}
+                <span className="truncate">{displayedTenant?.nome}</span>
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {displayedTenant?.endereco ?? "Endereço não informado"}
@@ -215,18 +215,48 @@ function ClientPortal() {
                 setAccessToken(null);
                 mutation.reset();
               }}
-              className="flex items-center gap-2 rounded-xl border border-border/60 bg-card px-3 py-2 text-xs text-muted-foreground hover:border-primary/50 hover:text-primary"
+              className="flex shrink-0 items-center gap-2 rounded-xl border border-border/60 bg-card px-3 py-2 text-xs text-muted-foreground hover:border-primary/50 hover:text-primary"
             >
               <LogOut className="size-4" /> SAIR
             </button>
           </div>
         </header>
 
-        <main className="page-enter mx-auto max-w-5xl px-5 py-8 md:py-12">
-          <div className="grid gap-8 md:grid-cols-[1.25fr_0.75fr]">
-            <section>
-              <p className="text-sm text-muted-foreground">Olá, {data.customer?.nome} 👋</p>
-              <h1 className="sr-only">Veículo {data.vehicle.placa}</h1>
+        <main className="page-enter mx-auto max-w-5xl px-5 py-6 md:py-10">
+          <h1 className="sr-only">Veículo {data.vehicle.placa}</h1>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">Olá, {data.customer?.nome} 👋</p>
+            {activeOrder ? (
+              <p className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-[11px] font-semibold text-primary">
+                <span className="relative flex size-2">
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-75" />
+                  <span className="relative inline-flex size-2 rounded-full bg-primary" />
+                </span>
+                AO VIVO · atualiza sozinho
+                <RefreshCw
+                  className={`size-3 ${liveQuery.isFetching ? "animate-spin" : "opacity-60"}`}
+                />
+              </p>
+            ) : null}
+          </div>
+
+          {activeOrder ? (
+            <ActiveOrderCard order={activeOrder} plate={data.vehicle.placa} pix={data.pix} />
+          ) : (
+            <section className="mt-5 flex items-center gap-4 rounded-3xl border border-border/60 bg-card p-6 shadow-card">
+              <Car className="size-8 shrink-0 text-primary" strokeWidth={1.5} />
+              <div>
+                <p className="font-semibold">Nenhum atendimento em andamento</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Quando o seu carro chegar ao lava-jato, o andamento aparece aqui.
+                </p>
+              </div>
+            </section>
+          )}
+
+          <section className="mt-8 grid items-center gap-6 md:grid-cols-[1.25fr_0.75fr]">
+            <div>
+              <p className="text-xs font-semibold text-primary">Seu veículo</p>
               <m.div
                 initial={{ opacity: 0, y: 16, rotate: -2 }}
                 animate={{ opacity: 1, y: 0, rotate: 0 }}
@@ -240,113 +270,15 @@ function ClientPortal() {
                   .filter(Boolean)
                   .join(" · ")}
               </p>
-              {activeOrder ? (
-                <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-[11px] font-semibold text-primary">
-                  <span className="relative flex size-2">
-                    <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-75" />
-                    <span className="relative inline-flex size-2 rounded-full bg-primary" />
-                  </span>
-                  AO VIVO · atualiza sozinho
-                  <RefreshCw
-                    className={`size-3 ${liveQuery.isFetching ? "animate-spin" : "opacity-60"}`}
-                  />
-                </p>
-              ) : null}
-            </section>
-
-            <section className="reveal-stagger grid h-fit grid-cols-2 overflow-hidden rounded-2xl border border-border bg-card">
+            </div>
+            <div className="reveal-stagger grid h-fit grid-cols-2 overflow-hidden rounded-2xl border border-border bg-card">
               <Metric label="ATENDIMENTOS" value={String(data.summary.totalOrders)} />
               <Metric label="TOTAL PAGO" value={brl(data.summary.totalSpent)} />
               <Metric label="ÚLTIMA VISITA" value={dateBR(data.summary.lastVisit)} wide />
-            </section>
-          </div>
-
-          {activeOrder ? (
-            <Reveal className="mt-10">
-              <section className="overflow-hidden rounded-3xl border border-primary/50 bg-card shadow-glow">
-                <div className="flex flex-wrap items-start justify-between gap-4 bg-brand px-5 py-4 text-primary-foreground">
-                  <div>
-                    <p className="text-xs font-bold">
-                      {readyForPickup ? "VEÍCULO PRONTO PARA RETIRADA" : "ATENDIMENTO EM CURSO"}
-                    </p>
-                    <h2 className="mt-1 text-2xl font-bold">#{activeOrder.numero}</h2>
-                  </div>
-                  <p className="rounded-xl border border-primary-foreground/30 bg-background/15 px-3 py-2 text-xs font-bold">
-                    {CLIENT_STATUS_LABEL[activeOrder.status as OrderStatus]}
-                  </p>
-                </div>
-                <div className="p-5 md:p-7">
-                  <OrderTimeline
-                    status={activeOrder.status as OrderStatus}
-                    title="Onde está o seu carro"
-                  />
-                  <PickupNotice status={activeOrder.status as OrderStatus} pix={data.pix} />
-                  <div className="mt-7 grid gap-5 border-t border-border/60 pt-5 md:grid-cols-[1fr_auto]">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Serviços</p>
-                      <div className="mt-3 space-y-2">
-                        {activeOrder.service_order_items.map((item) => (
-                          <div key={item.id} className="flex items-center gap-2 text-sm">
-                            <Wrench className="size-4 text-primary" />
-                            {item.nome}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="md:text-right">
-                      <p className="text-xs text-muted-foreground">Total</p>
-                      <p className="mt-2 text-3xl font-bold tabular-nums">
-                        {brl(activeOrder.total)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </section>
-            </Reveal>
-          ) : (
-            <section className="mt-10 flex items-center gap-4 rounded-3xl border border-border/60 bg-card p-6 shadow-card">
-              <Car className="size-8 shrink-0 text-primary" strokeWidth={1.5} />
-              <div>
-                <p className="font-semibold">Nenhum atendimento em andamento</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Quando o seu carro chegar ao lava-jato, o andamento aparece aqui.
-                </p>
-              </div>
-            </section>
-          )}
-
-          <section className="mt-10">
-            <div className="flex items-end justify-between border-b border-border/60 pb-3">
-              <div>
-                <p className="text-xs font-semibold text-primary">Histórico</p>
-                <h2 className="mt-1 text-2xl font-bold">Serviços realizados</h2>
-              </div>
-              <ReceiptText className="size-6 text-muted-foreground" />
-            </div>
-
-            <div className="reveal-stagger mt-3 divide-y divide-border rounded-2xl border border-border bg-card px-5">
-              {data.orders.map((order) => (
-                <article key={order.id} className="grid gap-4 py-5 md:grid-cols-[110px_1fr_140px]">
-                  <div>
-                    <p className="text-xs text-muted-foreground">#{order.numero}</p>
-                    <p className="mt-1 text-sm">{dateBR(order.created_at)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-primary">
-                      {CLIENT_STATUS_LABEL[order.status as OrderStatus]}
-                    </p>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {order.service_order_items.map((item) => item.nome).join(" · ")}
-                    </p>
-                  </div>
-                  <p className="text-lg font-bold tabular-nums md:text-right">{brl(order.total)}</p>
-                </article>
-              ))}
-              {data.orders.length === 0 && (
-                <p className="py-6 text-sm text-muted-foreground">Nenhum serviço encontrado.</p>
-              )}
             </div>
           </section>
+
+          <History orders={pastOrders} />
 
           <footer className="mt-12 grid gap-3 border-t border-border/60 pt-5 text-xs text-muted-foreground md:grid-cols-2">
             <p className="flex items-center gap-2">
@@ -597,25 +529,161 @@ type PortalPix = {
   qrCodeDataUrl: string;
 };
 
-function PickupNotice({ status, pix }: { status: OrderStatus; pix: PortalPix | null }) {
-  if (status === "FINALIZADO" || status === "AGUARDANDO_PAGAMENTO") {
-    return (
-      <div className="mt-5 flex gap-3 rounded-2xl border border-warning/40 bg-warning/10 p-4">
-        <CircleCheckBig className="mt-0.5 size-5 shrink-0 text-warning" />
-        <div>
-          <p className="font-semibold">Seu veículo está pronto para retirada.</p>
-          <p className="mt-1 text-sm leading-5 text-muted-foreground">
-            {pix
-              ? "O serviço foi concluído. Pague via PIX agora ou no lava-jato e retire o veículo."
-              : "O serviço foi concluído. Faça o pagamento no lava-jato e retire o veículo."}
-          </p>
-          {pix ? <PixPaymentCard pix={pix} /> : null}
-        </div>
-      </div>
-    );
-  }
+type PortalOrder = {
+  id: string;
+  numero: number;
+  status: string;
+  total: number;
+  created_at: string;
+  finished_at?: string | null;
+  updated_at?: string | null;
+  service_order_items: Array<{ id: string; nome: string }>;
+};
 
-  return null;
+/** Relógio que avança sozinho, para "atualizado há 3 min" não ficar parado. */
+function useNow(intervalMs = 30_000) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), intervalMs);
+    return () => window.clearInterval(timer);
+  }, [intervalMs]);
+  return now;
+}
+
+function ActiveOrderCard({
+  order,
+  plate,
+  pix,
+}: {
+  order: PortalOrder;
+  plate: string;
+  pix: PortalPix | null;
+}) {
+  const now = useNow();
+  const status = order.status as OrderStatus;
+  const message = portalStatusMessage(status, pix !== null);
+  const ready = message.tom === "pronto";
+  const arrived = whenText(order.created_at, now);
+  const updated = sinceText(order.updated_at ?? order.created_at, now);
+  const finished = ready ? whenText(order.finished_at, now) : null;
+
+  return (
+    <Reveal className="mt-5">
+      <section
+        aria-live="polite"
+        className="overflow-hidden rounded-3xl border border-primary/50 bg-card shadow-glow"
+      >
+        <div className="bg-brand px-5 py-5 text-primary-foreground md:px-7">
+          <div className="flex items-center justify-between gap-3 text-xs font-bold">
+            <span>
+              ATENDIMENTO #{order.numero} · {plate}
+            </span>
+            {ready ? <CircleCheckBig className="size-5 shrink-0" /> : null}
+          </div>
+          <h2 className="mt-3 text-[clamp(1.6rem,7vw,2.25rem)] font-bold leading-tight">
+            {message.titulo}
+          </h2>
+          <p className="mt-1.5 text-sm opacity-85">{message.detalhe}</p>
+          <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold">
+            {arrived ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-background/15 px-2.5 py-1">
+                <Clock3 className="size-3.5" /> Chegou {arrived}
+              </span>
+            ) : null}
+            {finished ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-background/15 px-2.5 py-1">
+                <Check className="size-3.5" /> Pronto {finished}
+              </span>
+            ) : null}
+            {updated ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-background/15 px-2.5 py-1">
+                <RefreshCw className="size-3.5" /> Atualizado {updated}
+              </span>
+            ) : null}
+          </div>
+        </div>
+        <div className="p-5 md:p-7">
+          <OrderTimeline status={status} title="Onde está o seu carro" />
+          {pix && (status === "FINALIZADO" || status === "AGUARDANDO_PAGAMENTO") ? (
+            <PixPaymentCard pix={pix} />
+          ) : null}
+          <div className="mt-6 grid gap-5 border-t border-border/60 pt-5 md:grid-cols-[1fr_auto]">
+            <div>
+              <p className="text-xs text-muted-foreground">Serviços</p>
+              <div className="mt-3 space-y-2">
+                {order.service_order_items.map((item) => (
+                  <div key={item.id} className="flex items-center gap-2 text-sm">
+                    <Wrench className="size-4 shrink-0 text-primary" />
+                    {item.nome}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="md:text-right">
+              <p className="text-xs text-muted-foreground">Total</p>
+              <p className="mt-2 text-3xl font-bold tabular-nums">{brl(order.total)}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </Reveal>
+  );
+}
+
+const HISTORY_PREVIEW = 5;
+
+function History({ orders }: { orders: PortalOrder[] }) {
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? orders : orders.slice(0, HISTORY_PREVIEW);
+  return (
+    <section className="mt-10">
+      <div className="flex items-end justify-between border-b border-border/60 pb-3">
+        <div>
+          <p className="text-xs font-semibold text-primary">Histórico</p>
+          <h2 className="mt-1 text-2xl font-bold">Serviços realizados</h2>
+        </div>
+        <ReceiptText className="size-6 text-muted-foreground" />
+      </div>
+
+      <div className="reveal-stagger mt-3 divide-y divide-border rounded-2xl border border-border bg-card px-5">
+        {visible.map((order) => (
+          <article
+            key={order.id}
+            className="grid grid-cols-[1fr_auto] items-center gap-x-4 py-4 md:grid-cols-[170px_1fr_140px] md:py-5"
+          >
+            <p className="whitespace-nowrap text-xs text-muted-foreground md:text-sm">
+              #{order.numero} · {dateBR(order.created_at)}
+            </p>
+            <p className="row-span-2 text-right text-lg font-bold tabular-nums md:order-last md:row-span-1">
+              {brl(order.total)}
+            </p>
+            <div className="mt-1 min-w-0 md:mt-0">
+              <p className="text-xs font-semibold text-primary">
+                {CLIENT_STATUS_LABEL[order.status as OrderStatus]}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {order.service_order_items.map((item) => item.nome).join(" · ")}
+              </p>
+            </div>
+          </article>
+        ))}
+        {orders.length === 0 && (
+          <p className="py-6 text-sm text-muted-foreground">Nenhum serviço anterior.</p>
+        )}
+      </div>
+      {orders.length > HISTORY_PREVIEW ? (
+        <button
+          type="button"
+          onClick={() => setShowAll((value) => !value)}
+          aria-expanded={showAll}
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-border/60 bg-card/60 py-3 text-xs font-semibold text-muted-foreground hover:border-primary/50 hover:text-primary"
+        >
+          {showAll ? "Mostrar menos" : `Ver todos (${orders.length})`}
+          <ChevronDown className={`size-4 transition-transform ${showAll ? "rotate-180" : ""}`} />
+        </button>
+      ) : null}
+    </section>
+  );
 }
 
 function PixPaymentCard({ pix }: { pix: PortalPix }) {

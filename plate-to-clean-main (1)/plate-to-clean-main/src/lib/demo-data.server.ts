@@ -53,6 +53,8 @@ type DemoOrder = {
   total: number;
   created_at: string;
   finished_at: string | null;
+  /** Última mudança de etapa (a área do cliente mostra "atualizado há …"). */
+  updated_at?: string;
   observacoes: string | null;
   customers: DemoCustomer;
   vehicles: DemoVehicle;
@@ -867,6 +869,7 @@ function demoPortalForVehicle(vehicle: DemoVehicle) {
       total: order.total,
       created_at: order.created_at,
       finished_at: order.finished_at,
+      updated_at: order.updated_at ?? order.finished_at ?? order.created_at,
       service_order_items: order.service_order_items,
       payments: order.payments,
     }));
@@ -1097,6 +1100,7 @@ export function demoUpdateOrderStatus(id: string, status: OrderStatus) {
   const order = demoGetOrder(id);
   assertOrderTransition(order.status, status, { canCancel: true });
   order.status = status;
+  order.updated_at = now();
   if (status === "AGUARDANDO_PAGAMENTO") order.finished_at = now();
   return { ok: true };
 }
@@ -1108,6 +1112,7 @@ export function demoRegisterPayment(id: string, metodo: PaymentMethod) {
     throw new Error("Esta ordem de serviço já possui pagamento registrado.");
   }
   order.status = "PAGO";
+  order.updated_at = now();
   order.payments = [
     { id: `payment-demo-${Date.now()}`, metodo, valor: order.total, pago_em: now() },
   ];

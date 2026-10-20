@@ -321,7 +321,7 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
         supabaseAdmin
           .from("service_orders")
           .select(
-            "id, numero, status, total, created_at, finished_at, service_order_items(id, nome, preco, quantidade), payments(id, metodo, valor, pago_em)",
+            "id, numero, status, total, created_at, finished_at, updated_at, service_order_items(id, nome, preco, quantidade), payments(id, metodo, valor, pago_em)",
           )
           .eq("tenant_id", vehicle.tenant_id)
           .eq("vehicle_id", vehicle.id)
