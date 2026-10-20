@@ -4,3 +4,9 @@
 
 [build.environment]
   NITRO_PRESET = "netlify"
+  # Valores públicos por design: o Vite os embute no bundle do navegador
+  # (URL do Supabase, chave publishable e flag de demo). As versões sem VITE_
+  # usadas no servidor compartilham os mesmos valores. Segredos reais
+  # (CLIENT_PORTAL_SECRET, SUPABASE_SERVICE_ROLE_KEY, OPENAI_API_KEY) continuam
+  # sendo verificados pelo secrets scanning.
+  SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_URL,VITE_SUPABASE_PUBLISHABLE_KEY,SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,VITE_DEMO_MODE,DEMO_MODE"
