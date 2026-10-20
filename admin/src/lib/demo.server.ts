@@ -32,7 +32,7 @@ type DemoState = {
 };
 
 /** Muda quando o formato dos dados fictícios muda; arquivos antigos são recriados. */
-const VERSION = 2;
+const VERSION = 3;
 const ADMIN_EMAIL = "admin@lavapro.local";
 
 const FILE = resolve(process.cwd(), ".data", "admin-demo.json");
@@ -120,15 +120,15 @@ function seedPayments(): PaymentRecord[] {
   // [empresa, valor, meses, forma, dias atrás]
   const rows: Array<[string, number, number, string, number]> = [
     ...[6, 36, 66, 96, 126, 156].map(
-      (ago) => ["demo-1", 89.9, 1, "PIX", ago] as [string, number, number, string, number],
+      (ago) => ["demo-1", 99.9, 1, "PIX", ago] as [string, number, number, string, number],
     ),
-    ["demo-3", 49.9, 1, "PIX", 103],
-    ["demo-3", 134.7, 3, "TRANSFERENCIA", 73],
+    ["demo-3", 79.9, 1, "PIX", 103],
+    ["demo-3", 239.7, 3, "TRANSFERENCIA", 73],
     ...[26, 56, 86, 116, 146].map(
-      (ago) => ["demo-4", 89.9, 1, "CARTAO", ago] as [string, number, number, string, number],
+      (ago) => ["demo-4", 99.9, 1, "CARTAO", ago] as [string, number, number, string, number],
     ),
-    ["demo-5", 49.9, 1, "BOLETO", 61],
-    ["demo-5", 49.9, 1, "BOLETO", 31],
+    ["demo-5", 79.9, 1, "BOLETO", 61],
+    ["demo-5", 79.9, 1, "BOLETO", 31],
   ];
   return rows.map(([tenant, amount, months, method, ago], index) => ({
     id: `pay-${index + 1}`,

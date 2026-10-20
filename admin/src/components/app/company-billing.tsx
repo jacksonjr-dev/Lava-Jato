@@ -106,6 +106,14 @@ function PaymentForm({ company, onDone }: { company: CompanyDetail; onDone: () =
     company.subscription.plan === "BASICO" ? "BASICO" : "MAX",
   );
   const [months, setMonths] = useState<1 | 3 | 6 | 12>(1);
+  // Sugere a mensalidade do plano × meses até alguém digitar outro valor (ex.: desconto).
+  const [amountEdited, setAmountEdited] = useState(false);
+  const monthly = PLANS[plan].precoMensal;
+  const suggested =
+    activate && monthly
+      ? (Math.round(monthly * months * 100) / 100).toFixed(2).replace(".", ",")
+      : "";
+  const amountText = amountEdited || !suggested ? amount : suggested;
 
   let preview = "";
   if (activate) {
@@ -113,7 +121,7 @@ function PaymentForm({ company, onDone }: { company: CompanyDetail; onDone: () =
     preview = `${PLANS[plan].nome} válido até ${formatDate(withSubscription(next).subscription.expiresAt)}.`;
   }
 
-  const value = parseAmount(amount);
+  const value = parseAmount(amountText);
   const mutation = useMutation({
     mutationFn: () =>
       save({
@@ -150,12 +158,21 @@ function PaymentForm({ company, onDone }: { company: CompanyDetail; onDone: () =
         <label className="space-y-1.5">
           <span className="text-xs font-semibold">Valor (R$)</span>
           <Input
-            value={amount}
-            onChange={(event) => setAmount(event.target.value)}
+            value={amountText}
+            onChange={(event) => {
+              setAmount(event.target.value);
+              setAmountEdited(true);
+            }}
             inputMode="decimal"
             placeholder="89,90"
             aria-label="Valor"
           />
+          {suggested && !amountEdited ? (
+            <span className="block text-[11px] text-muted-foreground">
+              Mensalidade do {PLANS[plan].nome} × {months} {months === 1 ? "mês" : "meses"}. Dá para
+              alterar (ex.: desconto).
+            </span>
+          ) : null}
         </label>
         <label className="space-y-1.5">
           <span className="text-xs font-semibold">Data do pagamento</span>

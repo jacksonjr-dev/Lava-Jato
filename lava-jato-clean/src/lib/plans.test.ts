@@ -152,3 +152,13 @@ describe("o que cada plano libera", () => {
     expect(hasFeature(sub, "logo")).toBe(true);
   });
 });
+
+describe("preços", () => {
+  it("Básico R$ 79,90 e Max R$ 99,90 por mês", () => {
+    expect(PLANS.BASICO.preco).toBe("R$ 79,90");
+    expect(PLANS.BASICO.precoMensal).toBe(79.9);
+    expect(PLANS.MAX.preco).toBe("R$ 99,90");
+    expect(PLANS.MAX.precoMensal).toBe(99.9);
+    expect(PLANS.GRATIS.precoMensal).toBe(0);
+  });
+});

@@ -42,8 +42,10 @@ export type PlanDefinition = {
   id: PlanId;
   nome: string;
   descricao: string;
-  /** Ex.: "R$ 79". null exibe "Sob consulta". */
+  /** Ex.: "R$ 79,90". null exibe "Sob consulta". */
   preco: string | null;
+  /** Mensalidade em reais (o painel admin usa para sugerir o valor do pagamento). */
+  precoMensal: number | null;
   destaque?: boolean;
   features: Feature[];
   limiteMensalAtendimentos: number | null;
@@ -58,6 +60,7 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     nome: "Grátis",
     descricao: "Para organizar o pátio sem custo.",
     preco: "R$ 0",
+    precoMensal: 0,
     features: [],
     limiteMensalAtendimentos: FREE_MONTHLY_ORDER_LIMIT,
     itens: [
@@ -71,7 +74,8 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     id: "BASICO",
     nome: "Básico",
     descricao: "Para lava-jatos com movimento diário.",
-    preco: null,
+    preco: "R$ 79,90",
+    precoMensal: 79.9,
     features: ["area_cliente", "pix", "financeiro", "logo"],
     limiteMensalAtendimentos: null,
     itens: [
@@ -86,7 +90,8 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     id: "MAX",
     nome: "Max",
     descricao: "Para quem quer gestão completa e agilidade no pátio.",
-    preco: null,
+    preco: "R$ 99,90",
+    precoMensal: 99.9,
     destaque: true,
     features: ["area_cliente", "pix", "financeiro", "logo", "analise", "exportacao", "placa_foto"],
     limiteMensalAtendimentos: null,
