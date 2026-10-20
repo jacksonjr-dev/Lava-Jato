@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { WashMark } from "@core/components/app/wash-brand";
+import { Turnstile } from "@core/components/app/turnstile";
+import { turnstileSiteKey } from "@core/lib/captcha";
 import { supabase } from "@/integrations/supabase/client";
 import { whoAmI } from "@/lib/admin.functions";
 import { DEMO_ADMIN, DEMO_SESSION_KEY, isAdminDemo } from "@/lib/demo-flag";
@@ -31,6 +33,10 @@ function LoginPage() {
   const [secret, setSecret] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Com a verificação anti-robô ligada no Supabase, o login também precisa do token.
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
+  const captchaRequired = turnstileSiteKey() !== null && !isAdminDemo();
 
   async function run(task: () => Promise<void>) {
     setBusy(true);
@@ -90,8 +96,19 @@ function LoginPage() {
         setStep("codigo");
         return;
       }
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-      if (signInError) throw new Error("E-mail ou senha incorretos.");
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+        options: captchaToken ? { captchaToken } : {},
+      });
+      setCaptchaReset((value) => value + 1);
+      if (signInError) {
+        throw new Error(
+          /captcha/i.test(signInError.message)
+            ? "Aguarde a verificação anti-robô e tente de novo."
+            : "E-mail ou senha incorretos.",
+        );
+      }
       await afterPassword();
     });
   }
@@ -164,8 +181,15 @@ function LoginPage() {
                 required
               />
             </div>
+            {captchaRequired ? (
+              <Turnstile onToken={setCaptchaToken} resetKey={captchaReset} />
+            ) : null}
             <Feedback error={error} />
-            <Button type="submit" className="h-12 w-full rounded-2xl" disabled={busy}>
+            <Button
+              type="submit"
+              className="h-12 w-full rounded-2xl"
+              disabled={busy || (captchaRequired && !captchaToken)}
+            >
               {busy ? <Loader2 className="size-5 animate-spin" /> : "Continuar"}
             </Button>
           </form>
