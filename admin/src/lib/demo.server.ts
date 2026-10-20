@@ -15,6 +15,7 @@ import {
 import type { FinancePayment } from "./finance";
 import {
   planChange,
+  suspensionReason,
   withSubscription,
   type CompanyDetail,
   type CompanyRow,
@@ -293,4 +294,30 @@ export function demoGetFinanceData(): { payments: FinancePayment[]; companies: C
       tenantName: names.get(payment.tenant_id) ?? "Empresa removida",
     })),
   };
+}
+
+export function demoSetSuspension(id: string, suspend: boolean, reason: string): CompanyDetail {
+  const cleanReason = suspensionReason(reason);
+  const state = load();
+  const company = state.companies.find((item) => item.id === id);
+  if (!company) throw new Error("Empresa não encontrada.");
+  if (Boolean(company.suspended_at) === suspend) {
+    throw new Error(suspend ? "A empresa já está suspensa." : "A empresa já está ativa.");
+  }
+  company.suspended_at = suspend ? new Date().toISOString() : null;
+  company.suspended_reason = suspend ? cleanReason : null;
+  state.events.push({
+    id: `event-${Date.now()}`,
+    tenant_id: id,
+    action: suspend ? "SUSPENDER" : "REATIVAR",
+    from_plan: company.plan,
+    to_plan: company.plan,
+    to_trial_ends_at: company.trial_ends_at,
+    to_expires_at: company.plan_expires_at,
+    reason: cleanReason,
+    admin_email: ADMIN_EMAIL,
+    created_at: new Date().toISOString(),
+  });
+  save(state);
+  return demoGetCompany(id);
 }

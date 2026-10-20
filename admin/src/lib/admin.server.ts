@@ -13,6 +13,7 @@ import {
 import type { FinancePayment } from "./finance";
 import {
   planChange,
+  suspensionReason,
   withSubscription,
   type CompanyDetail,
   type CompanyRow,
@@ -26,7 +27,7 @@ const PAYMENT_COLUMNS =
   "id, tenant_id, amount, method, paid_at, plan, months, note, admin_email, created_at";
 
 const TENANT_COLUMNS =
-  "id, nome, slug, telefone, logo_url, created_at, plan, trial_ends_at, plan_expires_at";
+  "id, nome, slug, telefone, logo_url, created_at, plan, trial_ends_at, plan_expires_at, suspended_at, suspended_reason";
 
 async function ownerEmails(db: ReturnType<typeof createAdminClient>, tenantIds: string[]) {
   const [{ data: owners }, users] = await Promise.all([
@@ -249,4 +250,43 @@ export async function getFinanceData(): Promise<{
       tenantName: names.get(payment.tenant_id) ?? "Empresa removida",
     })),
   };
+}
+
+/** Suspende ou reativa a empresa; a trava de acesso fica no banco (app.current_tenant). */
+export async function setSuspension(
+  id: string,
+  suspend: boolean,
+  reason: string,
+  admin: Admin,
+): Promise<CompanyDetail> {
+  const cleanReason = suspensionReason(reason);
+  const db = createAdminClient();
+  const { data: current, error } = await db
+    .from("tenants")
+    .select("plan, suspended_at")
+    .eq("id", id)
+    .maybeSingle();
+  if (error || !current) throw new Error("Empresa não encontrada.");
+  if (Boolean(current.suspended_at) === suspend) {
+    throw new Error(suspend ? "A empresa já está suspensa." : "A empresa já está ativa.");
+  }
+  const { error: updateError } = await db
+    .from("tenants")
+    .update({
+      suspended_at: suspend ? new Date().toISOString() : null,
+      suspended_reason: suspend ? cleanReason : null,
+    })
+    .eq("id", id);
+  if (updateError) throw new Error("Não foi possível alterar o acesso da empresa.");
+  const { error: eventError } = await db.from("subscription_events").insert({
+    tenant_id: id,
+    admin_user_id: admin.adminUserId,
+    admin_email: admin.adminEmail,
+    action: suspend ? "SUSPENDER" : "REATIVAR",
+    from_plan: current.plan,
+    to_plan: current.plan,
+    reason: cleanReason,
+  });
+  if (eventError) console.error("[admin] histórico não registrado", eventError.message);
+  return getCompany(id);
 }

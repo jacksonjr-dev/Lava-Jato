@@ -7,6 +7,7 @@ import { PLANS, type PlanId } from "@core/lib/plans";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { expiryText, formatDate, SubscriptionBadge } from "@/components/app/subscription-badge";
+import { SuspendedBadge } from "@/components/app/suspension-card";
 import { listCompanies } from "@/lib/admin.functions";
 import {
   filterCompanies,
@@ -181,8 +182,12 @@ function CompaniesPage() {
                       {company.ownerEmail ?? "sem e-mail"}
                     </p>
                   </div>
-                  <div className="md:order-none">
-                    <SubscriptionBadge subscription={company.subscription} />
+                  <div className="flex flex-wrap justify-end gap-1 md:order-none md:justify-start">
+                    {company.suspended_at ? (
+                      <SuspendedBadge />
+                    ) : (
+                      <SubscriptionBadge subscription={company.subscription} />
+                    )}
                   </div>
                   <p className="col-span-2 text-xs text-muted-foreground md:col-span-1">
                     {expiryText(company.subscription)}

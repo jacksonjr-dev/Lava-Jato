@@ -711,6 +711,8 @@ export type Database = {
           plan_expires_at: string | null;
           public_listing: boolean;
           slug: string;
+          suspended_at: string | null;
+          suspended_reason: string | null;
           telefone: string | null;
           trial_ends_at: string | null;
           updated_at: string;
@@ -731,6 +733,8 @@ export type Database = {
           plan_expires_at?: string | null;
           public_listing?: boolean;
           slug: string;
+          suspended_at?: string | null;
+          suspended_reason?: string | null;
           telefone?: string | null;
           trial_ends_at?: string | null;
           updated_at?: string;
@@ -751,6 +755,8 @@ export type Database = {
           plan_expires_at?: string | null;
           public_listing?: boolean;
           slug?: string;
+          suspended_at?: string | null;
+          suspended_reason?: string | null;
           telefone?: string | null;
           trial_ends_at?: string | null;
           updated_at?: string;

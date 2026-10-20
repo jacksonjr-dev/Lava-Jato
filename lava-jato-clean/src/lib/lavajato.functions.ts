@@ -12,6 +12,7 @@ import {
   requireManager,
   requireMembership,
   vehicleSummary,
+  tenantSuspension,
 } from "./lavajato.server";
 import { normalizePlate } from "./plate";
 import type { Database, Json } from "@/integrations/supabase/types";
@@ -156,6 +157,7 @@ export const searchPublicTenants = createServerFn({ method: "GET" })
       .from("tenants")
       .select("id, slug, nome, endereco, logo_url, plan, trial_ends_at, plan_expires_at")
       .eq("public_listing", true)
+      .is("suspended_at", null)
       .or(`nome.ilike.%${safeQuery}%,slug.ilike.%${safeQuery.toLowerCase()}%`)
       .order("nome", { ascending: true })
       .limit(40);
@@ -206,6 +208,7 @@ export const publicTenantBySlug = createServerFn({ method: "GET" })
       .from("tenants")
       .select("id, slug, nome, endereco, logo_url, plan, trial_ends_at, plan_expires_at")
       .eq("slug", data.slug)
+      .is("suspended_at", null)
       .maybeSingle();
     if (error) throw new Error("Não foi possível abrir o link do lava-jato.");
     if (!tenant || !hasFeature(resolveSubscription(tenant), "area_cliente")) return null;
@@ -362,7 +365,7 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
         supabaseAdmin
           .from("tenants")
           .select(
-            "id, slug, nome, telefone, endereco, horario, business_hours, logo_url, pix_key, pix_receiver_name, pix_city, plan, trial_ends_at, plan_expires_at",
+            "id, slug, nome, telefone, endereco, horario, business_hours, logo_url, pix_key, pix_receiver_name, pix_city, plan, trial_ends_at, plan_expires_at, suspended_at",
           )
           .eq("id", vehicle.tenant_id)
           .single(),
@@ -378,6 +381,9 @@ export const clientPortalLogin = createServerFn({ method: "POST" })
       ]);
     if (tenantError || ordersError) {
       throw new Error("Não foi possível consultar seus atendimentos.");
+    }
+    if (tenant?.suspended_at) {
+      throw new Error("Este lava-jato não está disponível no momento.");
     }
 
     const subscription = portalSubscription(tenant);
@@ -428,10 +434,15 @@ export const getSession = createServerFn({ method: "GET" })
         usage: { ordersThisMonth: demoOrdersThisMonth() },
         isPlatformAdmin: true,
         user: { id: "demo-user", email: "demo@lavapro.local" },
+        suspension: null,
       };
     }
     const isPlatformAdmin = await checkPlatformAdmin(context.userId);
     const membership = await getMembership(context.supabase, context.userId);
+    const user = {
+      id: context.userId,
+      email: typeof context.claims.email === "string" ? context.claims.email : null,
+    };
     if (!membership) {
       return {
         membership: null,
@@ -439,10 +450,20 @@ export const getSession = createServerFn({ method: "GET" })
         subscription: null,
         usage: null,
         isPlatformAdmin,
-        user: {
-          id: context.userId,
-          email: typeof context.claims.email === "string" ? context.claims.email : null,
-        },
+        user,
+        suspension: null,
+      };
+    }
+    const suspension = await tenantSuspension(membership.tenantId);
+    if (suspension.suspended) {
+      return {
+        membership,
+        tenant: null,
+        subscription: null,
+        usage: null,
+        isPlatformAdmin,
+        user,
+        suspension: { reason: suspension.reason },
       };
     }
     const { data: tenant, error } = await context.supabase
@@ -463,10 +484,8 @@ export const getSession = createServerFn({ method: "GET" })
             : await ordersThisMonth(context.supabase, membership.tenantId),
       },
       isPlatformAdmin,
-      user: {
-        id: context.userId,
-        email: typeof context.claims.email === "string" ? context.claims.email : null,
-      },
+      user,
+      suspension: null,
     };
   });
 
@@ -556,7 +575,10 @@ export const verifyOwnerBusiness = createServerFn({ method: "POST" })
     const membership = await getMembership(context.supabase, context.userId);
     if (!membership) return { ok: true, needsOnboarding: true };
 
-    const { data: tenant, error } = await context.supabase
+    // Service role: suspensa, a empresa fica invisível ao dono pelo RLS e o login
+    // diria "senha incorreta"; aqui o vínculo já foi conferido pelo próprio usuário.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: tenant, error } = await supabaseAdmin
       .from("tenants")
       .select("nome, slug")
       .eq("id", membership!.tenantId)

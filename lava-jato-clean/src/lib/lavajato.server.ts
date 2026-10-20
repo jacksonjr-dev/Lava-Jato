@@ -22,6 +22,22 @@ export async function getMembership(sb: DB, userId: string): Promise<Membership 
   return { tenantId: data.tenant_id, role: data.role };
 }
 
+/**
+ * Empresa suspensa pelo painel admin? Lê com o service role porque, suspensa, a
+ * empresa fica invisível para o próprio dono (app.current_tenant no banco).
+ */
+export async function tenantSuspension(
+  tenantId: string,
+): Promise<{ suspended: boolean; reason: string | null }> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await supabaseAdmin
+    .from("tenants")
+    .select("suspended_at, suspended_reason")
+    .eq("id", tenantId)
+    .maybeSingle();
+  return { suspended: Boolean(data?.suspended_at), reason: data?.suspended_reason ?? null };
+}
+
 export async function requireMembership(sb: DB, userId: string): Promise<Membership> {
   const m = await getMembership(sb, userId);
   if (!m) throw new Error("Nenhum lava-jato vinculado a este usuário.");

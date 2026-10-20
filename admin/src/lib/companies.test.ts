@@ -4,6 +4,7 @@ import {
   filterCompanies,
   planChange,
   summarize,
+  suspensionReason,
   withSubscription,
   type Company,
   type CompanyRow,
@@ -104,5 +105,37 @@ describe("ações de plano", () => {
     expect(describeEvent({ ...base, action: "GRATIS", from_plan: "MAX", to_plan: "GRATIS" })).toBe(
       "Voltou ao Grátis",
     );
+  });
+});
+
+describe("suspensão de empresa", () => {
+  const withSuspended = [
+    ...companies,
+    withSubscription(
+      row({ id: "6", nome: "Fake", suspended_at: days(-1), suspended_reason: "x" }),
+      NOW,
+    ),
+  ];
+
+  it("filtra e conta as suspensas", () => {
+    expect(filterCompanies(withSuspended, { status: "suspensas" }).map((c) => c.id)).toEqual(["6"]);
+    expect(summarize(withSuspended).suspensas).toBe(1);
+  });
+
+  it("exige motivo e registra no histórico", () => {
+    expect(() => suspensionReason("  ")).toThrow("motivo");
+    expect(suspensionReason("  cadastro falso ")).toBe("cadastro falso");
+    const event = {
+      id: "e",
+      from_plan: "MAX",
+      to_plan: "MAX",
+      to_trial_ends_at: null,
+      to_expires_at: null,
+      reason: "x",
+      admin_email: null,
+      created_at: NOW.toISOString(),
+    };
+    expect(describeEvent({ ...event, action: "SUSPENDER" })).toBe("Empresa suspensa");
+    expect(describeEvent({ ...event, action: "REATIVAR" })).toBe("Empresa reativada");
   });
 });

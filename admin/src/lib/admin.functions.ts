@@ -136,3 +136,16 @@ export const getFinanceData = createServerFn({ method: "GET" })
       : await (await import("./admin.server")).getFinanceData();
     return { payments, companies: companies.map((row) => withSubscription(row)) };
   });
+
+export const setSuspension = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .validator((data: { id: string; suspend: boolean; reason: string }) => ({
+    id: validId(data?.id),
+    suspend: data?.suspend === true,
+    reason: String(data?.reason ?? "").slice(0, 300),
+  }))
+  .handler(async ({ data, context }) =>
+    isDemo()
+      ? (await import("./demo.server")).demoSetSuspension(data.id, data.suspend, data.reason)
+      : (await import("./admin.server")).setSuspension(data.id, data.suspend, data.reason, context),
+  );

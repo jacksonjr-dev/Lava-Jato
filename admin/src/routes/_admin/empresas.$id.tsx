@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { expiryText, formatDate, SubscriptionBadge } from "@/components/app/subscription-badge";
 import { NotesCard, PaymentsCard } from "@/components/app/company-billing";
+import { SuspendedBadge, SuspensionCard } from "@/components/app/suspension-card";
 import { Card, Choice, Field, Line, textareaClass } from "@/components/app/panel";
 import { changeSubscription, getCompany } from "@/lib/admin.functions";
 import {
@@ -55,7 +56,10 @@ function CompanyPage() {
                 Código {company.slug} · cadastro em {formatDate(company.created_at)}
               </p>
             </div>
-            <SubscriptionBadge subscription={company.subscription} />
+            <div className="flex flex-wrap items-center gap-2">
+              {company.suspended_at ? <SuspendedBadge /> : null}
+              <SubscriptionBadge subscription={company.subscription} />
+            </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -88,7 +92,10 @@ function CompanyPage() {
           </div>
 
           <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-            <PlanActions company={company} />
+            <div className="space-y-4">
+              <PlanActions company={company} />
+              <SuspensionCard company={company} />
+            </div>
             <Card title="Histórico" icon={<History className="size-4 text-primary" />}>
               {company.events.length === 0 ? (
                 <p className="text-xs text-muted-foreground">Nenhuma alteração registrada ainda.</p>
@@ -97,13 +104,15 @@ function CompanyPage() {
                   {company.events.map((event) => (
                     <li key={event.id} className="border-l-2 border-primary/40 pl-3">
                       <p className="text-sm font-semibold">{describeEvent(event)}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {event.to_expires_at
-                          ? `Válido até ${formatDate(event.to_expires_at)}`
-                          : event.to_trial_ends_at
-                            ? `Teste até ${formatDate(event.to_trial_ends_at)}`
-                            : "Sem plano pago"}
-                      </p>
+                      {event.action === "SUSPENDER" || event.action === "REATIVAR" ? null : (
+                        <p className="text-xs text-muted-foreground">
+                          {event.to_expires_at
+                            ? `Válido até ${formatDate(event.to_expires_at)}`
+                            : event.to_trial_ends_at
+                              ? `Teste até ${formatDate(event.to_trial_ends_at)}`
+                              : "Sem plano pago"}
+                        </p>
+                      )}
                       <p className="mt-1 text-xs">“{event.reason}”</p>
                       <p className="mt-0.5 text-[10px] text-muted-foreground">
                         {new Date(event.created_at).toLocaleString("pt-BR")} ·{" "}

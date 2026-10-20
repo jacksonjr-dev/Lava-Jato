@@ -22,6 +22,9 @@ export type CompanyRow = {
   trial_ends_at: string | null;
   plan_expires_at: string | null;
   ordersThisMonth: number;
+  /** Suspensa pelo painel: o banco bloqueia o acesso da empresa aos dados. */
+  suspended_at?: string | null;
+  suspended_reason?: string | null;
 };
 
 export type Company = CompanyRow & { subscription: Subscription };
@@ -57,6 +60,7 @@ export const STATUS_FILTERS = [
   "TOLERANCIA",
   "GRATIS",
   "vencendo",
+  "suspensas",
 ] as const;
 export type StatusFilter = (typeof STATUS_FILTERS)[number];
 
@@ -67,6 +71,7 @@ export const STATUS_LABEL: Record<StatusFilter, string> = {
   TOLERANCIA: "Vencidas",
   GRATIS: "Grátis",
   vencendo: "Vencendo em 7 dias",
+  suspensas: "Suspensas",
 };
 
 /** Teste ou plano pago que termina em até 7 dias (quem precisa de contato). */
@@ -96,7 +101,13 @@ export function filterCompanies(
     if (!terms.every((term) => text.includes(term))) return false;
     const status = filters.status ?? "todas";
     if (status === "vencendo" && !isExpiringSoon(company.subscription)) return false;
-    if (status !== "todas" && status !== "vencendo" && company.subscription.status !== status) {
+    if (status === "suspensas" && !company.suspended_at) return false;
+    if (
+      status !== "todas" &&
+      status !== "vencendo" &&
+      status !== "suspensas" &&
+      company.subscription.status !== status
+    ) {
       return false;
     }
     if (
@@ -122,6 +133,7 @@ export function summarize(companies: Company[]) {
     vencidas: count((c) => c.subscription.status === "TOLERANCIA"),
     gratis: count((c) => c.subscription.status === "GRATIS"),
     vencendo: count((c) => isExpiringSoon(c.subscription)),
+    suspensas: count((c) => Boolean(c.suspended_at)),
     porPlano: {
       BASICO: count(
         (c) => c.subscription.status !== "TESTE" && c.subscription.effectivePlan === "BASICO",
@@ -164,8 +176,18 @@ export function planChange(
 /** Descrição curta de uma ação do histórico. */
 export function describeEvent(event: SubscriptionEvent): string {
   if (event.action === "GRATIS") return "Voltou ao Grátis";
+  if (event.action === "SUSPENDER") return "Empresa suspensa";
+  if (event.action === "REATIVAR") return "Empresa reativada";
   if (event.action === "ESTENDER_TESTE") return "Teste estendido";
   const plan =
     event.to_plan && event.to_plan in PLANS ? PLANS[event.to_plan as PlanId].nome : event.to_plan;
   return event.from_plan === event.to_plan ? `Renovou ${plan}` : `Ativou ${plan}`;
+}
+
+/** Motivo obrigatório para suspender ou reativar (fica no histórico). */
+export function suspensionReason(reason: string): string {
+  const clean = reason.trim();
+  if (clean.length < 3) throw new Error("Informe o motivo (mínimo de 3 caracteres).");
+  if (clean.length > 300) throw new Error("O motivo deve ter no máximo 300 caracteres.");
+  return clean;
 }

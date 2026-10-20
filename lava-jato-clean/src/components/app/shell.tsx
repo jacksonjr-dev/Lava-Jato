@@ -31,6 +31,7 @@ import { TenantLogo } from "@/components/app/tenant-logo";
 import { WashHoseBackdrop } from "@/components/app/wash-hose-backdrop";
 import { SubscriptionBanner } from "@/components/app/plan-gate";
 import { useFeature, useSessionQuery } from "@/hooks/use-plan";
+import { salesWhatsappLink } from "@/lib/plans";
 
 type MainTab = {
   to: "/home" | "/servicos" | "/financeiro" | "/veiculos";
@@ -79,6 +80,41 @@ export function AppShell({
     if (hasDemoSession()) endDemoSession();
     else await supabase.auth.signOut();
     navigate({ to: "/auth", replace: true });
+  }
+
+  // Empresa suspensa pelo painel admin: o banco já bloqueia os dados; aqui só explica.
+  const suspension = sessionQuery.data?.suspension;
+  if (suspension) {
+    const contact = salesWhatsappLink(
+      `Olá! A conta do meu lava-jato no LavaPro está suspensa. Pode me ajudar?`,
+    );
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-hero px-5 py-10">
+        <div className="w-full max-w-md rounded-3xl border border-warning/40 bg-card p-6 text-center shadow-card md:p-8">
+          <WashMark className="mx-auto size-10 text-primary" />
+          <h1 className="mt-5 text-2xl font-bold">Empresa suspensa</h1>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">
+            O acesso deste lava-jato ao LavaPro foi suspenso pela nossa equipe.
+            {suspension.reason ? ` Motivo: ${suspension.reason}` : ""}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Seus dados continuam guardados. Fale com a gente para resolver.
+          </p>
+          <div className="mt-6 grid gap-2">
+            {contact ? (
+              <Button asChild className="h-12 rounded-2xl">
+                <a href={contact} target="_blank" rel="noopener noreferrer">
+                  Falar com a equipe LavaPro
+                </a>
+              </Button>
+            ) : null}
+            <Button variant="outline" className="h-12 rounded-2xl" onClick={() => void signOut()}>
+              Sair
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
