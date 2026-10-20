@@ -3,7 +3,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { Building2, LayoutDashboard, LogOut, Wallet } from "lucide-react";
-import { WashMark } from "@/components/app/wash-brand";
+import { WashMark } from "@core/components/app/wash-brand";
 import { supabase } from "@/integrations/supabase/client";
 import { DEMO_SESSION_KEY, isAdminDemo } from "@/lib/demo-flag";
 

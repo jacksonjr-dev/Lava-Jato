@@ -20,7 +20,7 @@
     "noUncheckedSideEffectImports": true,
     "paths": {
       "@/*": ["./src/*"],
-      "@core/*": ["../plate-to-clean-main (1)/plate-to-clean-main/src/*"]
+      "@core/*": ["../lava-jato-clean/src/*"]
     }
   }
 }

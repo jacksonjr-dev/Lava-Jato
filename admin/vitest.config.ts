@@ -5,7 +5,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@core": fileURLToPath(
-        new URL("../plate-to-clean-main (1)/plate-to-clean-main/src", import.meta.url),
+        new URL("../lava-jato-clean/src", import.meta.url),
       ),
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },

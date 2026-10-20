@@ -2,7 +2,7 @@ import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@core/lib/utils";
 
 const buttonVariants = cva(
   "group relative isolate inline-flex items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-xl border border-transparent text-sm font-bold uppercase tracking-wide cursor-pointer transition-[color,background-color,border-color,transform,box-shadow] duration-200 before:pointer-events-none before:absolute before:inset-y-0 before:left-0 before:-z-0 before:w-1/4 before:bg-white/20 before:opacity-0 hover:-translate-y-1 hover:shadow-glow hover:before:animate-[button-sheen_650ms_ease-out] hover:before:opacity-100 active:translate-y-0 active:scale-[0.97] focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 [&>*]:relative [&>*]:z-10 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:transition-transform [&_svg]:duration-200 hover:[&_svg]:scale-110",
