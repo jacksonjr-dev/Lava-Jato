@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { agreement, findPlateCandidates, tallyVotes } from "./plate-ocr";
+import {
+  agreement,
+  combineReadings,
+  findPlateCandidates,
+  tallyVotes,
+  UNSURE_CONFIDENCE,
+} from "./plate-ocr";
 
 describe("OCR de placa", () => {
   it("acha a placa dentro do texto lido, ignorando ruído em volta", () => {
@@ -57,5 +63,26 @@ describe("OCR de placa", () => {
       { candidates: ["PLO8F28"], confidence: 0.6 },
     ]);
     expect(winner?.plate).toBe("PLQ8F28");
+  });
+});
+
+describe("conferência da leitura", () => {
+  it("mantém a leitura quando a conferência concorda ou não acha placa", () => {
+    const first = { plate: "BRA2E19", confidence: 0.82 };
+    expect(combineReadings(first, { plate: "BRA2E19", confidence: 0.7 })).toEqual({
+      ...first,
+      conflict: false,
+    });
+    expect(combineReadings(first, { plate: "", confidence: 0 }).conflict).toBe(false);
+    expect(combineReadings(first, null).conflict).toBe(false);
+  });
+
+  it("marca como incerta quando a conferência acha outra placa", () => {
+    expect(
+      combineReadings(
+        { plate: "RRA2E10", confidence: 0.99 },
+        { plate: "BRA2E19", confidence: 0.85 },
+      ),
+    ).toEqual({ plate: "RRA2E10", confidence: UNSURE_CONFIDENCE, conflict: true });
   });
 });

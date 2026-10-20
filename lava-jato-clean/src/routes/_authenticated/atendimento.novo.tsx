@@ -32,7 +32,9 @@ import {
   recognizePlate,
 } from "@/lib/lavajato.functions";
 import { brl, dateBR, normalizePlate } from "@/lib/plate";
-import { preloadPlateOcr, readPlateWithOcr } from "@/lib/plate-ocr";
+import { preloadPlateOcr, readPlateChecked, type CheckedOcrResult } from "@/lib/plate-ocr";
+import { assessPhoto, canUseInAppCamera, photoProblemMessage } from "@/lib/plate-camera";
+import { PlateCameraDialog } from "@/components/app/plate-camera-dialog";
 import { isDemoEnabled } from "@/lib/demo-auth";
 import { isWashService, toggleServiceSelection } from "@/lib/service-selection";
 
@@ -58,6 +60,11 @@ function NovoAtendimento() {
   const fileRef = useRef<HTMLInputElement>(null);
   const leituraPorFoto = useFeature("placa_foto");
   const [readingPhoto, setReadingPhoto] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  // Última foto lida: se nem o OCR nem a IA acharem a placa, ela explica o motivo.
+  const lastPhoto = useRef<{ photo: Blob; cropped: boolean } | null>(null);
+  // Leitura incerta do OCR (a conferência achou outra placa), enquanto a IA tenta.
+  const unsureReading = useRef<CheckedOcrResult | null>(null);
 
   // Baixa o motor de OCR enquanto a pessoa ainda está na tela da placa.
   useEffect(() => {
@@ -102,10 +109,17 @@ function NovoAtendimento() {
     mutationFn: (image: string) => recognizeFn({ data: { image } }),
     onSuccess: (res) => {
       if (!res.plate) {
-        toast.error("Não encontrei uma placa válida na foto. Digite manualmente.");
+        const unsure = unsureReading.current;
+        unsureReading.current = null;
+        if (unsure) {
+          showUnsureReading(unsure);
+          return;
+        }
         setConfidence(null);
+        void explainFailedPhoto();
         return;
       }
+      unsureReading.current = null;
       setPlate(res.plate);
       setConfidence(res.confidence);
       setSimulated(res.simulated);
@@ -151,21 +165,44 @@ function NovoAtendimento() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  async function onFile(file: File) {
+  /** Diz por que a foto não foi lida (escura, reflexo, tremida) para a próxima tentativa. */
+  async function explainFailedPhoto() {
+    const last = lastPhoto.current;
+    let problem = null;
+    try {
+      if (last) problem = await assessPhoto(last.photo, { checkSharpness: last.cropped });
+    } catch (error) {
+      console.error("[foto da placa]", error);
+    }
+    toast.error(photoProblemMessage(problem), { description: "Ou digite a placa no campo acima." });
+  }
+
+  function showUnsureReading(reading: CheckedOcrResult) {
+    setPlate(reading.plate);
+    setConfidence(reading.confidence);
+    setSimulated(false);
+    toast.warning("Leitura incerta: confira a placa antes de seguir.");
+  }
+
+  async function onFile(file: Blob, cropped = false) {
+    lastPhoto.current = { photo: file, cropped };
     setReadingPhoto(true);
     try {
-      // 1º OCR no próprio aparelho; 2º, se configurada, a leitura por IA no servidor.
-      const ocr = await readPlateWithOcr(file);
-      if (ocr.plate) {
+      // 1º OCR no próprio aparelho, conferido por uma 2ª leitura; se não achar a
+      // placa ou as leituras discordarem, a leitura por IA no servidor.
+      const ocr = await readPlateChecked(file);
+      if (ocr.plate && !ocr.conflict) {
         setPlate(ocr.plate);
         setConfidence(ocr.confidence);
         setSimulated(false);
         return;
       }
       if (isDemoEnabled()) {
-        toast.error("Não encontrei uma placa válida na foto. Digite manualmente.");
+        if (ocr.plate) showUnsureReading(ocr);
+        else await explainFailedPhoto();
         return;
       }
+      unsureReading.current = ocr.plate ? ocr : null;
       recognizeMutation.mutate(await plateImageDataUrl(file));
     } catch (error) {
       console.error("[OCR]", error);
@@ -285,7 +322,9 @@ function NovoAtendimento() {
                     <m.button
                       type="button"
                       whileTap={{ scale: 0.97 }}
-                      onClick={() => fileRef.current?.click()}
+                      onClick={() =>
+                        canUseInAppCamera() ? setCameraOpen(true) : fileRef.current?.click()
+                      }
                       disabled={readingPhoto || recognizeMutation.isPending}
                       className="flex h-20 w-full items-center justify-center gap-3 rounded-3xl border border-primary/40 bg-primary/10 text-sm font-bold text-primary transition-colors hover:bg-primary/15 disabled:opacity-60"
                     >
@@ -561,6 +600,19 @@ function NovoAtendimento() {
           </AnimatePresence>
         </div>
       </div>
+      {cameraOpen && (
+        <PlateCameraDialog
+          onPhoto={(photo) => {
+            setCameraOpen(false);
+            void onFile(photo, true);
+          }}
+          onUseNativeCamera={() => {
+            setCameraOpen(false);
+            fileRef.current?.click();
+          }}
+          onClose={() => setCameraOpen(false)}
+        />
+      )}
     </AppShell>
   );
 }
@@ -634,7 +686,7 @@ function MiniStat({ label, value }: { label: string; value: string }) {
 }
 
 // Reduz a foto da câmera (vários MB) para um JPEG leve antes de enviar ao servidor.
-async function plateImageDataUrl(file: File, maxSide = 1600): Promise<string> {
+async function plateImageDataUrl(file: Blob, maxSide = 1600): Promise<string> {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");

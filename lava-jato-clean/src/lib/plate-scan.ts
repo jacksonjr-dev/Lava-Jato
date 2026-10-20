@@ -24,6 +24,7 @@ export function assessFrameQuality(
   pixels: Uint8ClampedArray,
   width: number,
   height: number,
+  minSharpness = MIN_FRAME_SHARPNESS,
 ): FrameQuality {
   if (width < 3 || height < 3 || pixels.length < width * height * 4) {
     return { usable: false, brightness: 0, sharpness: 0, reason: "blurred" };
@@ -58,7 +59,7 @@ export function assessFrameQuality(
       ? "dark"
       : brightness > MAX_FRAME_BRIGHTNESS
         ? "bright"
-        : sharpness < MIN_FRAME_SHARPNESS
+        : sharpness < minSharpness
           ? "blurred"
           : null;
   return { usable: reason === null, brightness, sharpness, reason };

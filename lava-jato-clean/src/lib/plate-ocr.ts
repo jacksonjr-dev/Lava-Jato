@@ -379,3 +379,48 @@ export async function readPlateWithOcr(
     ? { plate: winner.plate, confidence: agreement(winner, readings.length) }
     : { plate: "", confidence: 0 };
 }
+
+/** Confiança exibida quando as duas leituras discordam: a tela pede para conferir. */
+export const UNSURE_CONFIDENCE = 0.5;
+
+export type CheckedOcrResult = OcrResult & { conflict: boolean };
+
+/**
+ * Junta a leitura principal com a de conferência. Se a conferência achar OUTRA
+ * placa válida, a leitura é incerta (o OCR pode errar com "99%" quando todas as
+ * tentativas partem da mesma imagem ruidosa). Conferência vazia não desmente a
+ * principal: numa foto do carro inteiro, a versão reduzida pode não achar a placa.
+ */
+export function combineReadings(first: OcrResult, second: OcrResult | null): CheckedOcrResult {
+  if (!first.plate) return { ...first, conflict: false };
+  if (second?.plate && second.plate !== first.plate) {
+    return {
+      plate: first.plate,
+      confidence: Math.min(first.confidence, UNSURE_CONFIDENCE),
+      conflict: true,
+    };
+  }
+  return { ...first, conflict: false };
+}
+
+/** A mesma foto reduzida, sem perda; ao ser ampliada para a leitura, o ruído de compressão some. */
+async function resampled(file: Blob, width = 700): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, width / bitmap.width);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!blob) throw new Error("Não foi possível preparar a conferência da foto.");
+  return blob;
+}
+
+/** Lê a placa e confere com uma segunda leitura da mesma foto em outro tamanho. */
+export async function readPlateChecked(file: Blob): Promise<CheckedOcrResult> {
+  const first = await readPlateWithOcr(file);
+  if (!first.plate) return { ...first, conflict: false };
+  const second = await readPlateWithOcr(await resampled(file)).catch(() => null);
+  return combineReadings(first, second);
+}
