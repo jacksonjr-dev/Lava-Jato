@@ -241,3 +241,53 @@ export function applyAdminSubscriptionAction(
   const base = plan === change.plan && currentExpiry && currentExpiry > now ? currentExpiry : now;
   return { plan: change.plan, trial_ends_at: null, plan_expires_at: addDays(base).toISOString() };
 }
+
+// ---------------------------------------------------------------------------
+// Desconto por período (pagamento adiantado)
+// ---------------------------------------------------------------------------
+
+export const BILLING_PERIODS = [1, 3, 6, 12] as const;
+export type BillingPeriod = (typeof BILLING_PERIODS)[number];
+
+/** Desconto (em %) sobre a mensalidade quando o plano é pago adiantado. */
+export const PERIOD_DISCOUNT_PERCENT: Record<BillingPeriod, number> = { 1: 0, 3: 5, 6: 10, 12: 15 };
+
+export const PERIOD_LABEL: Record<BillingPeriod, string> = {
+  1: "Mensal",
+  3: "Trimestral",
+  6: "Semestral",
+  12: "Anual",
+};
+
+/**
+ * Preço do plano no período: total a pagar, quanto sai por mês e a economia em
+ * relação a pagar mês a mês. Conta em centavos inteiros (sem erro de arredondamento
+ * de ponto flutuante). null para planos sem preço definido.
+ */
+export function periodPrice(plan: PlanId, months: BillingPeriod) {
+  const monthly = PLANS[plan].precoMensal;
+  if (monthly === null) return null;
+  const percent = PERIOD_DISCOUNT_PERCENT[months];
+  const fullCents = Math.round(monthly * 100) * months;
+  const totalCents = Math.round((fullCents * (100 - percent)) / 100);
+  return {
+    total: totalCents / 100,
+    perMonth: Math.round(totalCents / months) / 100,
+    discount: percent / 100,
+    savings: (fullCents - totalCents) / 100,
+  };
+}
+
+export function formatBRL(value: number): string {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+/** Texto do WhatsApp com o plano e o período escolhidos. */
+export function planRequestText(plan: PlanId, months: BillingPeriod, action: string): string {
+  const price = periodPrice(plan, months);
+  const period =
+    months === 1 || !price
+      ? ""
+      : ` no período ${PERIOD_LABEL[months].toLowerCase()} (${formatBRL(price.total)} a cada ${months} meses)`;
+  return `Olá! Quero ${action} o plano ${PLANS[plan].nome} do LavaPro${period}`;
+}

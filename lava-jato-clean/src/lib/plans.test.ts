@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  periodPrice,
   FREE_MONTHLY_ORDER_LIMIT,
   GRACE_DAYS,
   TRIAL_DAYS,
@@ -160,5 +161,25 @@ describe("preços", () => {
     expect(PLANS.MAX.preco).toBe("R$ 99,90");
     expect(PLANS.MAX.precoMensal).toBe(99.9);
     expect(PLANS.GRATIS.precoMensal).toBe(0);
+  });
+});
+
+describe("desconto por período", () => {
+  it("calcula total, valor por mês e economia", () => {
+    expect(periodPrice("MAX", 1)).toEqual({ total: 99.9, perMonth: 99.9, discount: 0, savings: 0 });
+    expect(periodPrice("MAX", 12)).toEqual({
+      total: 1018.98,
+      perMonth: 84.92,
+      discount: 0.15,
+      savings: 179.82,
+    });
+    expect(periodPrice("BASICO", 3)).toEqual({
+      total: 227.72,
+      perMonth: 75.91,
+      discount: 0.05,
+      savings: 11.98,
+    });
+    expect(periodPrice("BASICO", 6)?.total).toBe(431.46);
+    expect(periodPrice("GRATIS", 12)?.total).toBe(0);
   });
 });

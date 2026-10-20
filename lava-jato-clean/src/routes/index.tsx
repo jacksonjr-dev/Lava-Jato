@@ -21,7 +21,16 @@ import {
 } from "lucide-react";
 import { WashBrand } from "@/components/app/wash-brand";
 import { WashHoseBackdrop } from "@/components/app/wash-hose-backdrop";
-import { PLAN_IDS, PLANS, salesWhatsappLink, TRIAL_DAYS, type PlanId } from "@/lib/plans";
+import {
+  PLAN_IDS,
+  PLANS,
+  planRequestText,
+  salesWhatsappLink,
+  TRIAL_DAYS,
+  type BillingPeriod,
+  type PlanId,
+} from "@/lib/plans";
+import { BillingPeriodPicker, PlanPrice } from "@/components/app/plan-pricing";
 import { m } from "motion/react";
 import { Stagger, StaggerItem } from "@/components/app/motion";
 
@@ -629,6 +638,7 @@ function Security() {
 }
 
 function Plans() {
+  const [months, setMonths] = useState<BillingPeriod>(1);
   return (
     <section id="planos" className="mx-auto max-w-6xl scroll-mt-24 px-5 py-12">
       <SectionTitle
@@ -636,7 +646,13 @@ function Plans() {
         title="Escolha o plano do tamanho do seu pátio."
         description={`Comece com ${TRIAL_DAYS} dias grátis do plano Max. Depois, escolha o seu plano ou continue no Grátis, sem perder seus dados.`}
       />
-      <Stagger className="mt-8 grid gap-6 lg:grid-cols-3">
+      <div className="mt-8 flex flex-wrap items-center gap-3">
+        <BillingPeriodPicker value={months} onChange={setMonths} />
+        <p className="text-xs text-muted-foreground">
+          Pagando adiantado, a mensalidade sai mais barata.
+        </p>
+      </div>
+      <Stagger className="mt-6 grid gap-6 lg:grid-cols-3">
         {PLAN_IDS.map((id) => PLANS[id]).map((plan) => (
           <StaggerItem
             key={plan.nome}
@@ -652,12 +668,9 @@ function Plans() {
             )}
             <h3 className="text-2xl font-bold tracking-[-0.04em]">{plan.nome}</h3>
             <p className="mt-2 text-sm text-muted-foreground">{plan.descricao}</p>
-            <p className="mt-6 text-3xl font-bold text-primary">
-              {plan.preco ?? "Sob consulta"}
-              {plan.preco && plan.id !== "GRATIS" && (
-                <span className="text-sm font-normal text-muted-foreground">/mês</span>
-              )}
-            </p>
+            <div className="mt-6">
+              <PlanPrice plan={plan.id} months={months} />
+            </div>
             <ul className="mt-6 grid gap-3 text-sm text-muted-foreground">
               {plan.itens.map((item) => (
                 <li key={item} className="flex gap-3">
@@ -666,7 +679,7 @@ function Plans() {
                 </li>
               ))}
             </ul>
-            <PlanCta plan={plan} />
+            <PlanCta plan={plan} months={months} />
           </StaggerItem>
         ))}
       </Stagger>
@@ -689,7 +702,7 @@ function Plans() {
 }
 
 /** Grátis vai para o cadastro; os pagos abrem o WhatsApp para negociar. */
-function PlanCta({ plan }: { plan: (typeof PLANS)[PlanId] }) {
+function PlanCta({ plan, months }: { plan: (typeof PLANS)[PlanId]; months: BillingPeriod }) {
   const className = `flex h-12 items-center justify-center gap-2 border text-sm font-bold ${
     plan.destaque
       ? "border-primary bg-brand text-primary-foreground"
@@ -698,7 +711,7 @@ function PlanCta({ plan }: { plan: (typeof PLANS)[PlanId] }) {
   const whatsapp =
     plan.id === "GRATIS"
       ? null
-      : salesWhatsappLink(`Olá! Quero contratar o plano ${plan.nome} do LavaPro.`);
+      : salesWhatsappLink(`${planRequestText(plan.id, months, "contratar")}.`);
   return (
     <div className="mt-auto pt-8">
       {whatsapp ? (

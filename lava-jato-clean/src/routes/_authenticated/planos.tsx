@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Check, Crown, MessageCircle } from "lucide-react";
+import { BillingPeriodPicker, PlanPrice } from "@/components/app/plan-pricing";
 import { AppShell } from "@/components/app/shell";
 import { useSessionQuery } from "@/hooks/use-plan";
 import { dateBR } from "@/lib/plate";
@@ -10,6 +12,8 @@ import {
   salesWhatsappLink,
   type PlanId,
   type Subscription,
+  planRequestText,
+  type BillingPeriod,
 } from "@/lib/plans";
 
 export const Route = createFileRoute("/_authenticated/planos")({
@@ -30,6 +34,7 @@ const STATUS_LABEL: Record<Subscription["status"], string> = {
 };
 
 function PlansPage() {
+  const [months, setMonths] = useState<BillingPeriod>(1);
   const sessionQuery = useSessionQuery();
   const subscription = sessionQuery.data?.subscription ?? null;
   const tenantName = sessionQuery.data?.tenant?.nome ?? "meu lava-jato";
@@ -74,11 +79,19 @@ function PlansPage() {
         </section>
       )}
 
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <BillingPeriodPicker value={months} onChange={setMonths} />
+        <p className="text-xs text-muted-foreground">
+          Pagando adiantado, a mensalidade sai mais barata.
+        </p>
+      </div>
+
       <section className="reveal-stagger mt-6 grid gap-4 lg:grid-cols-3">
         {PLAN_IDS.map((id) => (
           <PlanCard
             key={id}
             id={id}
+            months={months}
             current={subscription?.effectivePlan === id && subscription.status !== "TESTE"}
             tenantName={tenantName}
           />
@@ -94,10 +107,12 @@ function PlansPage() {
 
 function PlanCard({
   id,
+  months,
   current,
   tenantName,
 }: {
   id: PlanId;
+  months: BillingPeriod;
   current: boolean;
   tenantName: string;
 }) {
@@ -106,9 +121,7 @@ function PlanCard({
     id === "GRATIS"
       ? null
       : salesWhatsappLink(
-          current
-            ? `Olá! Quero renovar o plano ${plan.nome} do LavaPro para ${tenantName}.`
-            : `Olá! Quero assinar o plano ${plan.nome} do LavaPro para ${tenantName}.`,
+          `${planRequestText(id, months, current ? "renovar" : "assinar")} para ${tenantName}.`,
         );
 
   return (
@@ -127,12 +140,9 @@ function PlanCard({
         <h2 className="text-2xl font-bold tracking-[-0.04em]">{plan.nome}</h2>
       </div>
       <p className="mt-2 text-sm text-muted-foreground">{plan.descricao}</p>
-      <p className="mt-5 text-3xl font-bold text-primary">
-        {plan.preco ?? "Sob consulta"}
-        {plan.preco && id !== "GRATIS" && (
-          <span className="text-sm font-normal text-muted-foreground">/mês</span>
-        )}
-      </p>
+      <div className="mt-5">
+        <PlanPrice plan={id} months={months} />
+      </div>
       <ul className="mt-5 grid gap-2.5 text-sm text-muted-foreground">
         {plan.itens.map((item) => (
           <li key={item} className="flex gap-3">

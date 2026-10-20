@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Loader2, NotebookPen, Plus, Wallet, X } from "lucide-react";
-import { PLANS } from "@core/lib/plans";
+import { PERIOD_LABEL, periodPrice, PLANS } from "@core/lib/plans";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatDate } from "@/components/app/subscription-badge";
@@ -108,11 +108,9 @@ function PaymentForm({ company, onDone }: { company: CompanyDetail; onDone: () =
   const [months, setMonths] = useState<1 | 3 | 6 | 12>(1);
   // Sugere a mensalidade do plano × meses até alguém digitar outro valor (ex.: desconto).
   const [amountEdited, setAmountEdited] = useState(false);
-  const monthly = PLANS[plan].precoMensal;
-  const suggested =
-    activate && monthly
-      ? (Math.round(monthly * months * 100) / 100).toFixed(2).replace(".", ",")
-      : "";
+  // Mesmo cálculo da página de planos: mensalidade × meses com o desconto do período.
+  const price = activate ? periodPrice(plan, months) : null;
+  const suggested = price && price.total > 0 ? price.total.toFixed(2).replace(".", ",") : "";
   const amountText = amountEdited || !suggested ? amount : suggested;
 
   let preview = "";
@@ -169,8 +167,11 @@ function PaymentForm({ company, onDone }: { company: CompanyDetail; onDone: () =
           />
           {suggested && !amountEdited ? (
             <span className="block text-[11px] text-muted-foreground">
-              Mensalidade do {PLANS[plan].nome} × {months} {months === 1 ? "mês" : "meses"}. Dá para
-              alterar (ex.: desconto).
+              {PERIOD_LABEL[months]} do {PLANS[plan].nome}
+              {price && price.discount > 0
+                ? ` com ${Math.round(price.discount * 100)}% de desconto`
+                : ""}
+              . Dá para alterar (ex.: desconto extra).
             </span>
           ) : null}
         </label>
