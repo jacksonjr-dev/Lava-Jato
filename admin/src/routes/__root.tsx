@@ -8,7 +8,7 @@ import {
 } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import appCss from "../styles.css?url";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@core/components/ui/sonner";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({

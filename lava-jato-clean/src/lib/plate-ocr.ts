@@ -59,16 +59,18 @@ export function preloadPlateOcr(): void {
  * Procura sequências de 7 caracteres que formem uma placa brasileira válida,
  * na ordem em que aparecem (a mais à esquerda primeiro).
  */
-export function findPlateCandidates(text: string, mercosul: boolean): string[] {
+export function findPlateCandidates(text: string, mercosul: boolean, strict = false): string[] {
   const found: string[] = [];
   for (const line of text.toUpperCase().split(/\n+/)) {
     const compact = normalizePlate(line);
     for (let start = 0; start + 7 <= compact.length; start++) {
-      let candidate = correctPlateCharacters(compact.slice(start, start + 7));
+      let candidate = compact.slice(start, start + 7);
+      if (!strict) candidate = correctPlateCharacters(candidate);
       const fifth = candidate[4]!;
-      if (mercosul && MERCOSUL_LETTER[fifth]) {
+      if (!strict && mercosul && MERCOSUL_LETTER[fifth]) {
         candidate = candidate.slice(0, 4) + MERCOSUL_LETTER[fifth] + candidate.slice(5);
       }
+      if (strict && mercosul && !/^[A-Z]{3}[0-9][A-Z][0-9]{2}$/.test(candidate)) continue;
       if (isValidPlate(candidate) && !found.includes(candidate)) found.push(candidate);
     }
   }
@@ -314,7 +316,10 @@ export function agreement(entry: { votes: number; confidence: number }, readings
 }
 
 /** Lê a placa da foto; devolve placa vazia se nada válido for encontrado. */
-export async function readPlateWithOcr(file: Blob): Promise<OcrResult> {
+export async function readPlateWithOcr(
+  file: Blob,
+  options: { strict?: boolean } = {},
+): Promise<OcrResult> {
   const bitmap = await createImageBitmap(file);
   const base = scaled(bitmap);
   bitmap.close();
@@ -359,7 +364,7 @@ export async function readPlateWithOcr(file: Blob): Promise<OcrResult> {
     if (debugEnabled())
       console.info("[OCR]", attempts.indexOf(attempt), JSON.stringify(data.text), data.confidence);
     readings.push({
-      candidates: findPlateCandidates(data.text, mercosul),
+      candidates: findPlateCandidates(data.text, mercosul, options.strict),
       confidence: Math.max(0, Math.min(1, data.confidence / 100)),
       ...(attempt.weight ? { weight: attempt.weight } : {}),
     });

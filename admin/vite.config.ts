@@ -8,7 +8,7 @@ import { nitro } from "nitro/vite";
 // Código compartilhado com o app dos lava-jatos (planos e tipos do banco).
 // Quando o repositório virar monorepo, isto aponta para packages/core.
 const core = fileURLToPath(
-  new URL("../plate-to-clean-main (1)/plate-to-clean-main/src", import.meta.url),
+  new URL("../lava-jato-clean/src", import.meta.url),
 );
 
 export default defineConfig({

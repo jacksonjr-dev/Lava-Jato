@@ -18,6 +18,14 @@ describe("OCR de placa", () => {
     expect(findPlateCandidates("", false)).toEqual([]);
   });
 
+  it("no scanner ao vivo não corrige caracteres ambíguos para forçar uma placa", () => {
+    expect(findPlateCandidates("LSN4149", true, true)).toEqual([]);
+    expect(findPlateCandidates("ABC1023", true, true)).toEqual([]);
+    expect(findPlateCandidates("ABC1O23", true, true)).toEqual(["ABC1O23"]);
+    expect(findPlateCandidates("ABC1D23", true, true)).toEqual(["ABC1D23"]);
+    expect(findPlateCandidates("ABC1234", false, true)).toEqual(["ABC1234"]);
+  });
+
   it("escolhe a placa com mais votos entre as leituras", () => {
     const [winner] = tallyVotes([
       { candidates: ["SNA1A93"], confidence: 0.42 },
