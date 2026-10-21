@@ -19,7 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/app/panel";
 import { formatDate } from "@/components/app/subscription-badge";
 import { inviteAdmin, listTeam, removeAdmin, whoAmI } from "@/lib/admin.functions";
-import { memberStatus, type TeamMember } from "@/lib/team";
+import { isOwner, memberStatus, ROLE_LABEL, type TeamMember } from "@/lib/team";
 
 export const Route = createFileRoute("/_admin/equipe")({
   head: () => ({ meta: [{ title: "Equipe — LavaPro Admin" }] }),
@@ -41,9 +41,22 @@ const STATUS: Record<ReturnType<typeof memberStatus>, { label: string; className
 function TeamPage() {
   const load = useServerFn(listTeam);
   const me = useServerFn(whoAmI);
-  const query = useQuery({ queryKey: ["team"], queryFn: () => load() });
   const meQuery = useQuery({ queryKey: ["me"], queryFn: () => me() });
+  const owner = isOwner(meQuery.data?.role);
+  const query = useQuery({ queryKey: ["team"], queryFn: () => load(), enabled: owner });
   const [inviting, setInviting] = useState(false);
+
+  if (meQuery.isSuccess && !owner) {
+    return (
+      <div className="mx-auto max-w-md rounded-2xl border border-border bg-card p-6 text-center">
+        <ShieldOff className="mx-auto size-8 text-muted-foreground" />
+        <h1 className="mt-3 text-lg font-bold">Acesso restrito</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Somente o dono do painel gerencia a equipe.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -141,6 +154,11 @@ function MemberRow({
         <p className="truncate text-sm font-semibold">
           {member.nome ?? member.email}
           {isMe ? <span className="ml-1.5 text-xs font-normal text-primary">(você)</span> : null}
+          {isOwner(member.role) ? (
+            <span className="ml-1.5 rounded-md bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold uppercase text-primary">
+              {ROLE_LABEL["DONO"]}
+            </span>
+          ) : null}
         </p>
         <p className="truncate text-xs text-muted-foreground">{member.email}</p>
         <p className="mt-0.5 text-[11px] text-muted-foreground">
@@ -155,7 +173,7 @@ function MemberRow({
       >
         {status.label}
       </span>
-      {!isMe && canRemove ? (
+      {!isMe && canRemove && !isOwner(member.role) ? (
         <Button
           variant="outline"
           size="sm"

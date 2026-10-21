@@ -40,9 +40,9 @@ export function validateInvite(input: { nome: string; email: string }) {
  */
 export function assertCanRemove(actorId: string, targetId: string, members: TeamMember[]) {
   if (actorId === targetId) throw new Error("Você não pode remover o seu próprio acesso.");
-  if (!members.some((member) => member.userId === targetId)) {
-    throw new Error("Administrador não encontrado.");
-  }
+  const target = members.find((member) => member.userId === targetId);
+  if (!target) throw new Error("Administrador não encontrado.");
+  if (isOwner(target.role)) throw new Error("O dono do painel não pode ser removido por aqui.");
   if (members.length <= 1) throw new Error("O painel precisa ter pelo menos um administrador.");
 }
 
@@ -62,3 +62,14 @@ export function memberStatus(member: TeamMember): "pendente" | "sem-autenticador
   if (!member.mfa) return "sem-autenticador";
   return "ativo";
 }
+
+/** Dono do painel: o único que gerencia a equipe (definido pelo SQL, não pelo painel). */
+export function isOwner(role: string | null | undefined): boolean {
+  return role === "DONO";
+}
+
+export function assertOwner(role: string | null | undefined) {
+  if (!isOwner(role)) throw new Error("Somente o dono do painel gerencia a equipe.");
+}
+
+export const ROLE_LABEL: Record<string, string> = { DONO: "Dono", ADMIN: "Administrador" };

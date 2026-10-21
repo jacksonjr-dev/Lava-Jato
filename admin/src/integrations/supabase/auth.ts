@@ -21,6 +21,7 @@ export const requireAdmin = createMiddleware({ type: "function" }).server(async 
       context: {
         adminUserId: "demo-admin" as string | null,
         adminEmail: "admin@lavapro.local" as string | null,
+        adminRole: "DONO" as string,
       },
     });
   }
@@ -38,7 +39,7 @@ export const requireAdmin = createMiddleware({ type: "function" }).server(async 
 
   const { data: admin } = await createAdminClient()
     .from("platform_admins")
-    .select("user_id")
+    .select("user_id, role")
     .eq("user_id", claims.sub)
     .maybeSingle();
   if (!admin) throw new Error("Acesso restrito à administração do LavaPro.");
@@ -47,6 +48,7 @@ export const requireAdmin = createMiddleware({ type: "function" }).server(async 
     context: {
       adminUserId: claims.sub as string | null,
       adminEmail: typeof claims["email"] === "string" ? (claims["email"] as string | null) : null,
+      adminRole: admin.role,
     },
   });
 });

@@ -46,6 +46,7 @@ O `db push` aplica só as que faltam. As novas desde a última publicação são
 | `20261020120000_portal_push_subscriptions.sql` | Avisos no celular do cliente |
 | `20261020150000_tenant_suspension.sql` | Suspensão de empresas (trava no banco) |
 | `20261021120000_platform_admins_team.sql` | Equipe do painel (nome, papel e registro de quem liberou/removeu acesso) |
+| `20261021150000_platform_admins_owner.sql` | Papel "Dono do painel" (só ele gerencia a equipe) |
 
 Confira em **Table Editor** se apareceram as tabelas `subscription_events`, `subscription_payments`, `tenant_notes` e `portal_push_subscriptions`.
 
@@ -217,14 +218,16 @@ O painel fica na pasta **`admin/`** e usa código de `lava-jato-clean/src` (plan
 
 ## 10. Administradores do painel e Google Authenticator
 
-### 10.1 O primeiro administrador (só uma vez, pelo Supabase)
+### 10.1 O dono do painel (só uma vez, pelo Supabase)
+
+O **Dono** é o único que vê a aba **Equipe** e convida ou remove administradores. Ninguém consegue se tornar Dono pelo painel: só por este SQL.
 
 1. **Supabase → Authentication → Users → Add user**: seu e-mail e uma senha forte (marque como já confirmado).
 2. **SQL Editor**:
 
    ```sql
-   insert into platform_admins (user_id, nome)
-   select id, 'SEU NOME' from auth.users where email = 'SEU-EMAIL-AQUI';
+   insert into platform_admins (user_id, nome, role)
+   select id, 'SEU NOME', 'DONO' from auth.users where email = 'SEU-EMAIL-AQUI';
    ```
 
 3. Abra o painel, entre com e-mail e senha. Aparece um **QR Code**:
@@ -234,7 +237,7 @@ O painel fica na pasta **`admin/`** e usa código de `lava-jato-clean/src` (plan
 
 ### 10.2 Os outros administradores (pelo próprio painel)
 
-1. No painel: **Equipe → Convidar administrador**, com nome e e-mail.
+1. O Dono, no painel: **Equipe → Convidar administrador**, com nome e e-mail. Quem é convidado entra como **Administrador**: usa todo o painel, menos a aba Equipe.
 2. A pessoa recebe o e-mail de convite (modelo **Invite user** do passo 2.4), abre o link e cria a senha (mínimo de 10 caracteres, com letras e números) na página `/convite` do painel.
 3. Ela entra no painel e lê o QR Code no Google Authenticator.
 4. Na tela **Equipe** dá para ver quem está com convite pendente ou sem autenticador, e **remover acesso**. Ninguém remove o próprio acesso e o painel nunca fica sem administrador. Cada liberação e remoção fica registrada.

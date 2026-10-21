@@ -324,7 +324,10 @@ export async function listTeam(): Promise<{ members: TeamMember[]; events: TeamE
       addedByEmail: admin.added_by ? (byId.get(admin.added_by)?.email ?? null) : null,
     };
   });
-  members.sort((a, b) => a.since.localeCompare(b.since));
+  members.sort(
+    (a, b) =>
+      Number(b.role === "DONO") - Number(a.role === "DONO") || a.since.localeCompare(b.since),
+  );
   return { members, events: (events ?? []) as TeamEvent[] };
 }
 

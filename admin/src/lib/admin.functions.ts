@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { requireAdmin } from "@/integrations/supabase/auth";
 import { PAYMENT_METHODS, type PaymentInput } from "./billing";
+import { assertOwner } from "./team";
 import { withSubscription, type PanelAction } from "./companies";
 
 const isDemo = () => process.env["ADMIN_DEMO_MODE"] === "true";
@@ -17,7 +18,7 @@ function validId(id: unknown): string {
 /** Confirma, no servidor, que a sessão é de um administrador (usado após o login). */
 export const whoAmI = createServerFn({ method: "GET" })
   .middleware([requireAdmin])
-  .handler(async ({ context }) => ({ email: context.adminEmail }));
+  .handler(async ({ context }) => ({ email: context.adminEmail, role: context.adminRole }));
 
 export const listCompanies = createServerFn({ method: "GET" })
   .middleware([requireAdmin])
@@ -153,11 +154,12 @@ export const setSuspension = createServerFn({ method: "POST" })
 
 export const listTeam = createServerFn({ method: "GET" })
   .middleware([requireAdmin])
-  .handler(async () =>
-    isDemo()
+  .handler(async ({ context }) => {
+    assertOwner(context.adminRole);
+    return isDemo()
       ? (await import("./demo.server")).demoListTeam()
-      : (await import("./admin.server")).listTeam(),
-  );
+      : (await import("./admin.server")).listTeam();
+  });
 
 export const inviteAdmin = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
@@ -166,6 +168,7 @@ export const inviteAdmin = createServerFn({ method: "POST" })
     email: String(data?.email ?? "").slice(0, 254),
   }))
   .handler(async ({ data, context }) => {
+    assertOwner(context.adminRole);
     if (isDemo()) return (await import("./demo.server")).demoInviteAdmin(data);
     // O link do e-mail volta para a página de criar senha deste mesmo painel.
     const origin = new URL(getRequest().url).origin;
@@ -181,8 +184,9 @@ export const removeAdmin = createServerFn({ method: "POST" })
     }
     return { userId };
   })
-  .handler(async ({ data, context }) =>
-    isDemo()
+  .handler(async ({ data, context }) => {
+    assertOwner(context.adminRole);
+    return isDemo()
       ? (await import("./demo.server")).demoRemoveAdmin(data.userId)
-      : (await import("./admin.server")).removeAdmin(data.userId, context),
-  );
+      : (await import("./admin.server")).removeAdmin(data.userId, context);
+  });

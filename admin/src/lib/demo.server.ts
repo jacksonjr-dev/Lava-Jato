@@ -35,7 +35,7 @@ type DemoState = {
 };
 
 /** Muda quando o formato dos dados fictícios muda; arquivos antigos são recriados. */
-const VERSION = 4;
+const VERSION = 5;
 const ADMIN_EMAIL = "admin@lavapro.local";
 
 const FILE = resolve(process.cwd(), ".data", "admin-demo.json");
@@ -127,7 +127,7 @@ function seed(): DemoState {
         userId: "demo-admin",
         nome: "Você (demonstração)",
         email: ADMIN_EMAIL,
-        role: "ADMIN",
+        role: "DONO",
         since: day(-30),
         lastSignInAt: new Date().toISOString(),
         mfa: true,

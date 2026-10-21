@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assertCanRemove,
+  assertOwner,
   memberStatus,
   validateInvite,
   validatePassword,
@@ -58,5 +59,15 @@ describe("situação de cada pessoa", () => {
     expect(memberStatus(member("a", { lastSignInAt: null }))).toBe("pendente");
     expect(memberStatus(member("a", { mfa: false }))).toBe("sem-autenticador");
     expect(memberStatus(member("a"))).toBe("ativo");
+  });
+});
+
+describe("dono do painel", () => {
+  it("só o dono gerencia a equipe e ninguém remove o dono", () => {
+    expect(() => assertOwner("ADMIN")).toThrow("dono do painel");
+    expect(() => assertOwner("DONO")).not.toThrow();
+    const team = [member("dono", { role: "DONO" }), member("b"), member("c")];
+    expect(() => assertCanRemove("b", "dono", team)).toThrow("dono do painel não pode");
+    expect(() => assertCanRemove("dono", "b", team)).not.toThrow();
   });
 });

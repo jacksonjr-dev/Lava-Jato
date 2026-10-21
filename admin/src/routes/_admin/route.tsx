@@ -1,7 +1,10 @@
 import { createFileRoute, Link, Outlet, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { whoAmI } from "@/lib/admin.functions";
+import { isOwner } from "@/lib/team";
 import { Building2, LayoutDashboard, LogOut, Users, Wallet } from "lucide-react";
 import { WashMark } from "@core/components/app/wash-brand";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,6 +31,10 @@ function AdminLayout() {
   const { email } = Route.useRouteContext();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const me = useServerFn(whoAmI);
+  // A aba Equipe só aparece para o dono do painel (o servidor também recusa os demais).
+  const meQuery = useQuery({ queryKey: ["me"], queryFn: () => me(), staleTime: 5 * 60_000 });
+  const owner = isOwner(meQuery.data?.role);
 
   async function signOut() {
     queryClient.clear();
@@ -55,7 +62,7 @@ function AdminLayout() {
             </span>
           )}
           <nav className="ml-4 hidden items-center gap-1 sm:flex">
-            <NavItems />
+            <NavItems owner={owner} />
           </nav>
           <div className="ml-auto flex items-center gap-3">
             <span className="hidden max-w-56 truncate text-xs text-muted-foreground lg:inline">
@@ -76,9 +83,9 @@ function AdminLayout() {
       </main>
       <nav
         aria-label="Navegação principal"
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 gap-1 border-t border-border bg-background/95 px-2 pt-1.5 pb-[calc(env(safe-area-inset-bottom,0px)+0.375rem)] sm:hidden"
+        className={`fixed inset-x-0 bottom-0 z-30 grid gap-1 ${owner ? "grid-cols-4" : "grid-cols-3"} border-t border-border bg-background/95 px-2 pt-1.5 pb-[calc(env(safe-area-inset-bottom,0px)+0.375rem)] sm:hidden`}
       >
-        <NavItems mobile />
+        <NavItems mobile owner={owner} />
       </nav>
     </div>
   );
@@ -117,13 +124,13 @@ const NAV = [
   { to: "/visao-geral", label: "Visão geral", icon: LayoutDashboard },
   { to: "/empresas", label: "Empresas", icon: Building2 },
   { to: "/financeiro", label: "Financeiro", icon: Wallet },
-  { to: "/equipe", label: "Equipe", icon: Users },
+  { to: "/equipe", label: "Equipe", icon: Users, ownerOnly: true },
 ] as const;
 
-function NavItems({ mobile = false }: { mobile?: boolean }) {
+function NavItems({ mobile = false, owner }: { mobile?: boolean; owner: boolean }) {
   return (
     <>
-      {NAV.map(({ to, label, icon: Icon }) => (
+      {NAV.filter((item) => owner || !("ownerOnly" in item)).map(({ to, label, icon: Icon }) => (
         <NavLink key={to} to={to} icon={<Icon className="size-4 shrink-0" />} mobile={mobile}>
           {label}
         </NavLink>
