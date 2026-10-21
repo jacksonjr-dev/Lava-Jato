@@ -646,11 +646,8 @@ function Plans() {
         title="Escolha o plano do tamanho do seu pátio."
         description={`Comece com ${TRIAL_DAYS} dias grátis do plano Max. Depois, escolha o seu plano ou continue no Grátis, sem perder seus dados.`}
       />
-      <div className="mt-8 flex flex-wrap items-center gap-3">
+      <div className="mt-8">
         <BillingPeriodPicker value={months} onChange={setMonths} />
-        <p className="text-xs text-muted-foreground">
-          Pagando adiantado, a mensalidade sai mais barata.
-        </p>
       </div>
       <Stagger className="mt-6 grid gap-6 lg:grid-cols-3">
         {PLAN_IDS.map((id) => PLANS[id]).map((plan) => (

@@ -79,11 +79,8 @@ function PlansPage() {
         </section>
       )}
 
-      <div className="mt-6 flex flex-wrap items-center gap-3">
+      <div className="mt-6">
         <BillingPeriodPicker value={months} onChange={setMonths} />
-        <p className="text-xs text-muted-foreground">
-          Pagando adiantado, a mensalidade sai mais barata.
-        </p>
       </div>
 
       <section className="reveal-stagger mt-6 grid gap-4 lg:grid-cols-3">
@@ -130,11 +127,20 @@ function PlanCard({
         plan.destaque ? "border-primary shadow-glow" : "border-border"
       }`}
     >
-      {current && (
-        <span className="absolute -top-3 left-6 bg-brand px-2 py-1 text-[10px] font-bold text-primary-foreground">
-          SEU PLANO
+      {current || plan.destaque ? (
+        <span className="absolute -top-3 left-6 flex gap-1.5">
+          {plan.destaque ? (
+            <span className="bg-brand px-2 py-1 text-[10px] font-bold text-primary-foreground">
+              MAIS ESCOLHIDO
+            </span>
+          ) : null}
+          {current ? (
+            <span className="border border-primary bg-card px-2 py-1 text-[10px] font-bold text-primary">
+              SEU PLANO
+            </span>
+          ) : null}
         </span>
-      )}
+      ) : null}
       <div className="flex items-center gap-2">
         {id === "MAX" && <Crown className="size-5 text-primary" />}
         <h2 className="text-2xl font-bold tracking-[-0.04em]">{plan.nome}</h2>
