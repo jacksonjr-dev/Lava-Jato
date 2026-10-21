@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  BILLING_PERIODS,
+  PERIOD_DISCOUNT_PERCENT,
   periodPrice,
   FREE_MONTHLY_ORDER_LIMIT,
   GRACE_DAYS,
@@ -165,21 +167,38 @@ describe("preços", () => {
 });
 
 describe("desconto por período", () => {
-  it("calcula total, valor por mês e economia", () => {
+  it("usa mensalidades redondas terminando em ,90", () => {
     expect(periodPrice("MAX", 1)).toEqual({ total: 99.9, perMonth: 99.9, discount: 0, savings: 0 });
     expect(periodPrice("MAX", 12)).toEqual({
-      total: 1018.98,
-      perMonth: 84.92,
+      total: 1018.8,
+      perMonth: 84.9,
       discount: 0.15,
-      savings: 179.82,
+      savings: 180,
     });
     expect(periodPrice("BASICO", 3)).toEqual({
-      total: 227.72,
-      perMonth: 75.91,
+      total: 227.7,
+      perMonth: 75.9,
       discount: 0.05,
-      savings: 11.98,
+      savings: 12,
     });
-    expect(periodPrice("BASICO", 6)?.total).toBe(431.46);
+    expect(periodPrice("BASICO", 6)).toMatchObject({ total: 431.4, perMonth: 71.9, discount: 0.1 });
+    expect(periodPrice("BASICO", 12)).toMatchObject({
+      total: 814.8,
+      perMonth: 67.9,
+      discount: 0.15,
+    });
+    expect(periodPrice("MAX", 3)).toMatchObject({ total: 284.7, discount: 0.05 });
+    expect(periodPrice("MAX", 6)).toMatchObject({ total: 539.4, discount: 0.1 });
     expect(periodPrice("GRATIS", 12)?.total).toBe(0);
+  });
+
+  it("o selo do seletor bate com o desconto real", () => {
+    for (const plan of ["BASICO", "MAX"] as const) {
+      for (const months of BILLING_PERIODS) {
+        expect(Math.round((periodPrice(plan, months)?.discount ?? 0) * 100)).toBe(
+          PERIOD_DISCOUNT_PERCENT[months],
+        );
+      }
+    }
   });
 });

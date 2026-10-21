@@ -260,6 +260,19 @@ export const PERIOD_LABEL: Record<BillingPeriod, string> = {
 };
 
 /**
+ * Mensalidade de cada período, em valores "redondos" (terminando em ,90). Os
+ * descontos ficam em ~5% (trimestral), ~10% (semestral) e ~15% (anual), como
+ * mostra o seletor (PERIOD_DISCOUNT_PERCENT).
+ */
+export const PERIOD_MONTHLY_PRICE: Record<
+  Exclude<PlanId, "GRATIS">,
+  Record<BillingPeriod, number>
+> = {
+  BASICO: { 1: 79.9, 3: 75.9, 6: 71.9, 12: 67.9 },
+  MAX: { 1: 99.9, 3: 94.9, 6: 89.9, 12: 84.9 },
+};
+
+/**
  * Preço do plano no período: total a pagar, quanto sai por mês e a economia em
  * relação a pagar mês a mês. Conta em centavos inteiros (sem erro de arredondamento
  * de ponto flutuante). null para planos sem preço definido.
@@ -267,14 +280,15 @@ export const PERIOD_LABEL: Record<BillingPeriod, string> = {
 export function periodPrice(plan: PlanId, months: BillingPeriod) {
   const monthly = PLANS[plan].precoMensal;
   if (monthly === null) return null;
-  const percent = PERIOD_DISCOUNT_PERCENT[months];
+  const perMonth = plan === "GRATIS" ? 0 : PERIOD_MONTHLY_PRICE[plan][months];
   const fullCents = Math.round(monthly * 100) * months;
-  const totalCents = Math.round((fullCents * (100 - percent)) / 100);
+  const totalCents = Math.round(perMonth * 100) * months;
+  const savingsCents = fullCents - totalCents;
   return {
     total: totalCents / 100,
-    perMonth: Math.round(totalCents / months) / 100,
-    discount: percent / 100,
-    savings: (fullCents - totalCents) / 100,
+    perMonth,
+    discount: fullCents ? Math.round((savingsCents / fullCents) * 100) / 100 : 0,
+    savings: savingsCents / 100,
   };
 }
 
