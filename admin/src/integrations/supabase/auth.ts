@@ -19,7 +19,7 @@ export const requireAdmin = createMiddleware({ type: "function" }).server(async 
   if (process.env["ADMIN_DEMO_MODE"] === "true") {
     return next({
       context: {
-        adminUserId: null as string | null,
+        adminUserId: "demo-admin" as string | null,
         adminEmail: "admin@lavapro.local" as string | null,
       },
     });

@@ -11,6 +11,7 @@ import {
   type PaymentRecord,
 } from "./billing";
 import type { FinancePayment } from "./finance";
+import { assertCanRemove, validateInvite, type TeamEvent, type TeamMember } from "./team";
 import {
   planChange,
   suspensionReason,
@@ -289,4 +290,106 @@ export async function setSuspension(
   });
   if (eventError) console.error("[admin] histórico não registrado", eventError.message);
   return getCompany(id);
+}
+
+// ---------------------------------------------------------------------------
+// Equipe do painel
+// ---------------------------------------------------------------------------
+
+export async function listTeam(): Promise<{ members: TeamMember[]; events: TeamEvent[] }> {
+  const db = createAdminClient();
+  const [{ data: admins, error }, users, { data: events }] = await Promise.all([
+    db.from("platform_admins").select("user_id, nome, role, added_by, created_at"),
+    db.auth.admin.listUsers({ perPage: 1000 }),
+    db
+      .from("platform_admin_events")
+      .select("id, action, target_email, actor_email, created_at")
+      .order("created_at", { ascending: false })
+      .limit(20),
+  ]);
+  if (error) throw new Error("Não foi possível carregar a equipe.");
+  const byId = new Map((users.data?.users ?? []).map((user) => [user.id, user]));
+  const members = (admins ?? []).map((admin) => {
+    const user = byId.get(admin.user_id);
+    return {
+      userId: admin.user_id,
+      nome: admin.nome,
+      email: user?.email ?? "(usuário removido)",
+      role: admin.role,
+      since: admin.created_at,
+      lastSignInAt: user?.last_sign_in_at ?? null,
+      mfa: (user?.factors ?? []).some(
+        (factor) => factor.factor_type === "totp" && factor.status === "verified",
+      ),
+      addedByEmail: admin.added_by ? (byId.get(admin.added_by)?.email ?? null) : null,
+    };
+  });
+  members.sort((a, b) => a.since.localeCompare(b.since));
+  return { members, events: (events ?? []) as TeamEvent[] };
+}
+
+/**
+ * Convida um administrador. E-mail novo recebe o convite do Supabase (cria a senha
+ * em /convite); quem já tem conta (ex.: também é dono de lava-jato) só ganha o acesso.
+ */
+export async function inviteAdmin(
+  input: { nome: string; email: string },
+  actor: Admin,
+  redirectTo: string,
+): Promise<{ invited: boolean }> {
+  const { nome, email } = validateInvite(input);
+  const db = createAdminClient();
+  const users = await db.auth.admin.listUsers({ perPage: 1000 });
+  let user = (users.data?.users ?? []).find((item) => item.email?.toLowerCase() === email);
+  let invited = false;
+  if (user) {
+    const { data: already } = await db
+      .from("platform_admins")
+      .select("user_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (already) throw new Error("Essa pessoa já faz parte da equipe.");
+  } else {
+    const { data, error } = await db.auth.admin.inviteUserByEmail(email, {
+      redirectTo,
+      data: { nome },
+    });
+    if (error || !data.user) throw new Error("Não foi possível enviar o convite.");
+    user = data.user;
+    invited = true;
+  }
+  const { error: insertError } = await db
+    .from("platform_admins")
+    .insert({ user_id: user.id, nome, added_by: actor.adminUserId });
+  if (insertError) throw new Error("Não foi possível liberar o acesso.");
+  await db.from("platform_admin_events").insert({
+    action: "ADICIONAR",
+    target_user_id: user.id,
+    target_email: email,
+    actor_user_id: actor.adminUserId,
+    actor_email: actor.adminEmail,
+  });
+  return { invited };
+}
+
+/** Remove o acesso ao painel. A conta continua existindo (pode ser dono de lava-jato). */
+export async function removeAdmin(userId: string, actor: Admin): Promise<void> {
+  const { members } = await listTeam();
+  assertCanRemove(actor.adminUserId ?? "", userId, members);
+  const target = members.find((member) => member.userId === userId)!;
+  const db = createAdminClient();
+  const { error } = await db.from("platform_admins").delete().eq("user_id", userId);
+  if (error) throw new Error("Não foi possível remover o acesso.");
+  // Sem o autenticador, quem voltar a ser convidado configura um novo do zero.
+  const { data: factors } = await db.auth.admin.mfa.listFactors({ userId });
+  for (const factor of factors?.factors ?? []) {
+    await db.auth.admin.mfa.deleteFactor({ userId, id: factor.id });
+  }
+  await db.from("platform_admin_events").insert({
+    action: "REMOVER",
+    target_user_id: userId,
+    target_email: target.email,
+    actor_user_id: actor.adminUserId,
+    actor_email: actor.adminEmail,
+  });
 }

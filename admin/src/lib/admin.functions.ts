@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { requireAdmin } from "@/integrations/supabase/auth";
 import { PAYMENT_METHODS, type PaymentInput } from "./billing";
 import { withSubscription, type PanelAction } from "./companies";
@@ -148,4 +149,40 @@ export const setSuspension = createServerFn({ method: "POST" })
     isDemo()
       ? (await import("./demo.server")).demoSetSuspension(data.id, data.suspend, data.reason)
       : (await import("./admin.server")).setSuspension(data.id, data.suspend, data.reason, context),
+  );
+
+export const listTeam = createServerFn({ method: "GET" })
+  .middleware([requireAdmin])
+  .handler(async () =>
+    isDemo()
+      ? (await import("./demo.server")).demoListTeam()
+      : (await import("./admin.server")).listTeam(),
+  );
+
+export const inviteAdmin = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .validator((data: { nome: string; email: string }) => ({
+    nome: String(data?.nome ?? "").slice(0, 120),
+    email: String(data?.email ?? "").slice(0, 254),
+  }))
+  .handler(async ({ data, context }) => {
+    if (isDemo()) return (await import("./demo.server")).demoInviteAdmin(data);
+    // O link do e-mail volta para a página de criar senha deste mesmo painel.
+    const origin = new URL(getRequest().url).origin;
+    return (await import("./admin.server")).inviteAdmin(data, context, `${origin}/convite`);
+  });
+
+export const removeAdmin = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .validator((data: { userId: string }) => {
+    const userId = String(data?.userId ?? "");
+    if (!(isDemo() ? /^demo-admin(-\d+)?$/.test(userId) : UUID.test(userId))) {
+      throw new Error("Administrador não encontrado.");
+    }
+    return { userId };
+  })
+  .handler(async ({ data, context }) =>
+    isDemo()
+      ? (await import("./demo.server")).demoRemoveAdmin(data.userId)
+      : (await import("./admin.server")).removeAdmin(data.userId, context),
   );

@@ -230,17 +230,56 @@ export type Database = {
           },
         ];
       };
+      platform_admin_events: {
+        Row: {
+          action: string;
+          actor_email: string | null;
+          actor_user_id: string | null;
+          created_at: string;
+          id: string;
+          target_email: string;
+          target_user_id: string | null;
+        };
+        Insert: {
+          action: string;
+          actor_email?: string | null;
+          actor_user_id?: string | null;
+          created_at?: string;
+          id?: string;
+          target_email: string;
+          target_user_id?: string | null;
+        };
+        Update: {
+          action?: string;
+          actor_email?: string | null;
+          actor_user_id?: string | null;
+          created_at?: string;
+          id?: string;
+          target_email?: string;
+          target_user_id?: string | null;
+        };
+        Relationships: [];
+      };
       platform_admins: {
         Row: {
+          added_by: string | null;
           created_at: string;
+          nome: string | null;
+          role: string;
           user_id: string;
         };
         Insert: {
+          added_by?: string | null;
           created_at?: string;
+          nome?: string | null;
+          role?: string;
           user_id: string;
         };
         Update: {
+          added_by?: string | null;
           created_at?: string;
+          nome?: string | null;
+          role?: string;
           user_id?: string;
         };
         Relationships: [];

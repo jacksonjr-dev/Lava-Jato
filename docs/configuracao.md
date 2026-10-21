@@ -45,6 +45,7 @@ O `db push` aplica só as que faltam. As novas desde a última publicação são
 | `20261019120000_trial_3_dias.sql` | Teste grátis de 3 dias para empresas novas |
 | `20261020120000_portal_push_subscriptions.sql` | Avisos no celular do cliente |
 | `20261020150000_tenant_suspension.sql` | Suspensão de empresas (trava no banco) |
+| `20261021120000_platform_admins_team.sql` | Equipe do painel (nome, papel e registro de quem liberou/removeu acesso) |
 
 Confira em **Table Editor** se apareceram as tabelas `subscription_events`, `subscription_payments`, `tenant_notes` e `portal_push_subscriptions`.
 
@@ -84,7 +85,7 @@ O link do e-mail de confirmação leva para `/home`; sem essas URLs, o Supabase 
 
 ### 2.4 Modelos de e-mail (opcional, recomendado)
 
-Em **Emails → Templates**, traduza para português pelo menos **Confirm signup** e **Reset password**. Exemplo para a confirmação:
+Em **Emails → Templates**, traduza para português pelo menos **Confirm signup**, **Invite user** (convite do painel admin) e **Reset password**. Exemplo para a confirmação:
 
 > **Assunto:** Confirme seu cadastro no LavaPro
 > **Corpo:** Olá! Clique no link para ativar sua conta no LavaPro: `{{ .ConfirmationURL }}`
@@ -214,14 +215,16 @@ O painel fica na pasta **`admin/`** e usa código de `lava-jato-clean/src` (plan
 
 ---
 
-## 10. Cadastrar o administrador e o Google Authenticator
+## 10. Administradores do painel e Google Authenticator
+
+### 10.1 O primeiro administrador (só uma vez, pelo Supabase)
 
 1. **Supabase → Authentication → Users → Add user**: seu e-mail e uma senha forte (marque como já confirmado).
 2. **SQL Editor**:
 
    ```sql
-   insert into platform_admins (user_id)
-   select id from auth.users where email = 'SEU-EMAIL-AQUI';
+   insert into platform_admins (user_id, nome)
+   select id, 'SEU NOME' from auth.users where email = 'SEU-EMAIL-AQUI';
    ```
 
 3. Abra o painel, entre com e-mail e senha. Aparece um **QR Code**:
@@ -229,7 +232,17 @@ O painel fica na pasta **`admin/`** e usa código de `lava-jato-clean/src` (plan
    - digite o código de 6 números para concluir.
 4. **Recomendado**: no mesmo momento, leia o QR Code também num **segundo aparelho** (reserva). O Supabase não tem códigos de recuperação.
 
-**Perdeu o celular?** Alguém com acesso ao Supabase abre **Authentication → Users → (o usuário) → Factors** e apaga o autenticador. No próximo login aparece um QR Code novo.
+### 10.2 Os outros administradores (pelo próprio painel)
+
+1. No painel: **Equipe → Convidar administrador**, com nome e e-mail.
+2. A pessoa recebe o e-mail de convite (modelo **Invite user** do passo 2.4), abre o link e cria a senha (mínimo de 10 caracteres, com letras e números) na página `/convite` do painel.
+3. Ela entra no painel e lê o QR Code no Google Authenticator.
+4. Na tela **Equipe** dá para ver quem está com convite pendente ou sem autenticador, e **remover acesso**. Ninguém remove o próprio acesso e o painel nunca fica sem administrador. Cada liberação e remoção fica registrada.
+
+> O link do convite volta para `https://painel.seudominio.com.br/convite`: por isso o endereço do painel precisa estar nas **Redirect URLs** (passo 2.1).
+> Se a pessoa já tem conta no LavaPro (ex.: também é dona de lava-jato), ela não recebe convite: só ganha o acesso e entra com a senha que já usa.
+
+**Perdeu o celular?** Outro administrador remove o acesso da pessoa e convida de novo (o autenticador antigo é apagado ao remover). Ou alguém com acesso ao Supabase abre **Authentication → Users → (o usuário) → Factors** e apaga o autenticador. No próximo login aparece um QR Code novo.
 
 ---
 
@@ -248,6 +261,7 @@ O painel fica na pasta **`admin/`** e usa código de `lava-jato-clean/src` (plan
 
 **Painel**
 - [ ] Login com senha + Google Authenticator.
+- [ ] Equipe: convidar um administrador → o e-mail chega → criar a senha em /convite → primeiro login com o QR Code.
 - [ ] Empresas: ativar plano, registrar pagamento, nota interna.
 - [ ] Suspender uma empresa de teste → o dono vê "Empresa suspensa" → reativar.
 - [ ] Ficar 30 minutos parado → o painel sai sozinho.

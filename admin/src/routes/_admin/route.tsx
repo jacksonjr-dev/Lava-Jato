@@ -2,7 +2,7 @@ import { createFileRoute, Link, Outlet, redirect, useNavigate } from "@tanstack/
 import { useEffect, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { Building2, LayoutDashboard, LogOut, Wallet } from "lucide-react";
+import { Building2, LayoutDashboard, LogOut, Users, Wallet } from "lucide-react";
 import { WashMark } from "@core/components/app/wash-brand";
 import { supabase } from "@/integrations/supabase/client";
 import { DEMO_SESSION_KEY, isAdminDemo } from "@/lib/demo-flag";
@@ -76,7 +76,7 @@ function AdminLayout() {
       </main>
       <nav
         aria-label="Navegação principal"
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 gap-1 border-t border-border bg-background/95 px-2 pt-1.5 pb-[calc(env(safe-area-inset-bottom,0px)+0.375rem)] sm:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 gap-1 border-t border-border bg-background/95 px-2 pt-1.5 pb-[calc(env(safe-area-inset-bottom,0px)+0.375rem)] sm:hidden"
       >
         <NavItems mobile />
       </nav>
@@ -117,6 +117,7 @@ const NAV = [
   { to: "/visao-geral", label: "Visão geral", icon: LayoutDashboard },
   { to: "/empresas", label: "Empresas", icon: Building2 },
   { to: "/financeiro", label: "Financeiro", icon: Wallet },
+  { to: "/equipe", label: "Equipe", icon: Users },
 ] as const;
 
 function NavItems({ mobile = false }: { mobile?: boolean }) {

@@ -13,6 +13,7 @@ import {
   type PaymentRecord,
 } from "./billing";
 import type { FinancePayment } from "./finance";
+import { assertCanRemove, validateInvite, type TeamEvent, type TeamMember } from "./team";
 import {
   planChange,
   suspensionReason,
@@ -29,10 +30,12 @@ type DemoState = {
   events: Array<SubscriptionEvent & { tenant_id: string }>;
   payments: PaymentRecord[];
   notes: NoteRecord[];
+  team: TeamMember[];
+  teamEvents: TeamEvent[];
 };
 
 /** Muda quando o formato dos dados fictícios muda; arquivos antigos são recriados. */
-const VERSION = 3;
+const VERSION = 4;
 const ADMIN_EMAIL = "admin@lavapro.local";
 
 const FILE = resolve(process.cwd(), ".data", "admin-demo.json");
@@ -113,7 +116,26 @@ function seed(): DemoState {
     ordersTotal: orders * (2 + index),
     ...sub,
   }));
-  return { version: VERSION, companies, events: [], payments: seedPayments(), notes: seedNotes() };
+  return {
+    version: VERSION,
+    companies,
+    events: [],
+    payments: seedPayments(),
+    notes: seedNotes(),
+    team: [
+      {
+        userId: "demo-admin",
+        nome: "Você (demonstração)",
+        email: ADMIN_EMAIL,
+        role: "ADMIN",
+        since: day(-30),
+        lastSignInAt: new Date().toISOString(),
+        mfa: true,
+        addedByEmail: null,
+      },
+    ],
+    teamEvents: [],
+  };
 }
 
 function seedPayments(): PaymentRecord[] {
@@ -320,4 +342,52 @@ export function demoSetSuspension(id: string, suspend: boolean, reason: string):
   });
   save(state);
   return demoGetCompany(id);
+}
+
+export function demoListTeam(): { members: TeamMember[]; events: TeamEvent[] } {
+  const state = load();
+  return { members: state.team, events: state.teamEvents.slice(-20).reverse() };
+}
+
+export function demoInviteAdmin(input: { nome: string; email: string }): { invited: boolean } {
+  const { nome, email } = validateInvite(input);
+  const state = load();
+  if (state.team.some((member) => member.email === email)) {
+    throw new Error("Essa pessoa já faz parte da equipe.");
+  }
+  const now = new Date().toISOString();
+  state.team.push({
+    userId: `demo-admin-${Date.now()}`,
+    nome,
+    email,
+    role: "ADMIN",
+    since: now,
+    lastSignInAt: null,
+    mfa: false,
+    addedByEmail: ADMIN_EMAIL,
+  });
+  state.teamEvents.push({
+    id: `team-${Date.now()}`,
+    action: "ADICIONAR",
+    target_email: email,
+    actor_email: ADMIN_EMAIL,
+    created_at: now,
+  });
+  save(state);
+  return { invited: true };
+}
+
+export function demoRemoveAdmin(userId: string): void {
+  const state = load();
+  assertCanRemove("demo-admin", userId, state.team);
+  const target = state.team.find((member) => member.userId === userId)!;
+  state.team = state.team.filter((member) => member.userId !== userId);
+  state.teamEvents.push({
+    id: `team-${Date.now()}`,
+    action: "REMOVER",
+    target_email: target.email,
+    actor_email: ADMIN_EMAIL,
+    created_at: new Date().toISOString(),
+  });
+  save(state);
 }

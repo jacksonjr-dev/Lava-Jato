@@ -11,7 +11,9 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteRouteImport } from './routes/_admin/route'
+import { Route as ConviteRouteImport } from './routes/convite'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as AdminEquipeRouteImport } from './routes/_admin/equipe'
 import { Route as AdminFinanceiroRouteImport } from './routes/_admin/financeiro'
 import { Route as AdminVisaoGeralRouteImport } from './routes/_admin/visao-geral'
 import { Route as AdminEmpresasIndexRouteImport } from './routes/_admin/empresas.index'
@@ -26,10 +28,20 @@ const AdminRouteRoute = AdminRouteRouteImport.update({
   id: '/_admin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ConviteRoute = ConviteRouteImport.update({
+  id: '/convite',
+  path: '/convite',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AdminEquipeRoute = AdminEquipeRouteImport.update({
+  id: '/equipe',
+  path: '/equipe',
+  getParentRoute: () => AdminRouteRoute,
 } as any)
 const AdminFinanceiroRoute = AdminFinanceiroRouteImport.update({
   id: '/financeiro',
@@ -54,7 +66,9 @@ const AdminEmpresasIdRoute = AdminEmpresasIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/convite': typeof ConviteRoute
   '/login': typeof LoginRoute
+  '/equipe': typeof AdminEquipeRoute
   '/financeiro': typeof AdminFinanceiroRoute
   '/visao-geral': typeof AdminVisaoGeralRoute
   '/empresas/$id': typeof AdminEmpresasIdRoute
@@ -62,7 +76,9 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/convite': typeof ConviteRoute
   '/login': typeof LoginRoute
+  '/equipe': typeof AdminEquipeRoute
   '/financeiro': typeof AdminFinanceiroRoute
   '/visao-geral': typeof AdminVisaoGeralRoute
   '/empresas/$id': typeof AdminEmpresasIdRoute
@@ -72,7 +88,9 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_admin': typeof AdminRouteRouteWithChildren
+  '/convite': typeof ConviteRoute
   '/login': typeof LoginRoute
+  '/_admin/equipe': typeof AdminEquipeRoute
   '/_admin/financeiro': typeof AdminFinanceiroRoute
   '/_admin/visao-geral': typeof AdminVisaoGeralRoute
   '/_admin/empresas/$id': typeof AdminEmpresasIdRoute
@@ -82,7 +100,9 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/convite'
     | '/login'
+    | '/equipe'
     | '/financeiro'
     | '/visao-geral'
     | '/empresas/$id'
@@ -90,7 +110,9 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/convite'
     | '/login'
+    | '/equipe'
     | '/financeiro'
     | '/visao-geral'
     | '/empresas/$id'
@@ -99,7 +121,9 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_admin'
+    | '/convite'
     | '/login'
+    | '/_admin/equipe'
     | '/_admin/financeiro'
     | '/_admin/visao-geral'
     | '/_admin/empresas/$id'
@@ -109,6 +133,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRouteRoute: typeof AdminRouteRouteWithChildren
+  ConviteRoute: typeof ConviteRoute
   LoginRoute: typeof LoginRoute
 }
 
@@ -128,12 +153,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/convite': {
+      id: '/convite'
+      path: '/convite'
+      fullPath: '/convite'
+      preLoaderRoute: typeof ConviteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_admin/equipe': {
+      id: '/_admin/equipe'
+      path: '/equipe'
+      fullPath: '/equipe'
+      preLoaderRoute: typeof AdminEquipeRouteImport
+      parentRoute: typeof AdminRouteRoute
     }
     '/_admin/financeiro': {
       id: '/_admin/financeiro'
@@ -167,6 +206,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteRouteChildren {
+  AdminEquipeRoute: typeof AdminEquipeRoute
   AdminFinanceiroRoute: typeof AdminFinanceiroRoute
   AdminVisaoGeralRoute: typeof AdminVisaoGeralRoute
   AdminEmpresasIdRoute: typeof AdminEmpresasIdRoute
@@ -174,6 +214,7 @@ interface AdminRouteRouteChildren {
 }
 
 const AdminRouteRouteChildren: AdminRouteRouteChildren = {
+  AdminEquipeRoute: AdminEquipeRoute,
   AdminFinanceiroRoute: AdminFinanceiroRoute,
   AdminVisaoGeralRoute: AdminVisaoGeralRoute,
   AdminEmpresasIdRoute: AdminEmpresasIdRoute,
@@ -187,6 +228,7 @@ const AdminRouteRouteWithChildren = AdminRouteRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRouteRoute: AdminRouteRouteWithChildren,
+  ConviteRoute: ConviteRoute,
   LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
