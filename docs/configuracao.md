@@ -54,8 +54,10 @@ Confira em **Table Editor** se apareceram as tabelas `subscription_events`, `sub
 
 Em **Project Settings → API** (ou **API Keys**) você encontra:
 
-- **Project URL** → vai em `SUPABASE_URL` e `VITE_SUPABASE_URL`.
-- **Publishable key** (`sb_publishable_…`) → vai em `SUPABASE_PUBLISHABLE_KEY` e `VITE_SUPABASE_PUBLISHABLE_KEY`. Pode ir para o navegador.
+- **Project URL** → vai em `SUPABASE_URL` (site e painel) e `VITE_SUPABASE_URL` (só no painel).
+- **Publishable key** (`sb_publishable_…`) → vai em `SUPABASE_PUBLISHABLE_KEY` (site e painel) e `VITE_SUPABASE_PUBLISHABLE_KEY` (só no painel).
+
+> O site não fala com o Supabase pelo navegador: entrar, criar conta e sair passam pelo servidor, e a sessão fica num cookie que o JavaScript não lê. Por isso o site não usa as variáveis `VITE_SUPABASE_…`.
 - **Secret / service_role key** → vai **só** em `SUPABASE_SERVICE_ROLE_KEY`. **Nunca** em variável que começa com `VITE_` (essas vão para o navegador).
 
 ---
@@ -72,13 +74,13 @@ Em **Authentication**:
   - `https://painel.seudominio.com.br/**` (painel admin)
   - `http://localhost:3000/**` (só se for testar localmente com o Supabase de verdade)
 
-O link do e-mail de confirmação leva para `/home`; sem essas URLs, o Supabase recusa o redirecionamento.
+O link do e-mail de confirmação leva para `/confirmar-email`; sem essas URLs, o Supabase recusa o redirecionamento.
 
 ### 2.2 Cadastro e senha
 
 - **Sign In / Providers → Email**: ligar **Confirm email**.
 - **Password**: tamanho mínimo **8** (o site já pede 8 para contas novas).
-- **Rate Limits**: confira os limites de cadastro e login por hora. Os padrões são bons para começar.
+- **Rate Limits**: confira os limites de cadastro, login e renovação de sessão. Como o login passa pelo servidor do site, o Supabase pode ver muitos acessos vindo dos mesmos endereços da Vercel: se aparecer "Muitas tentativas" para usuários diferentes ao mesmo tempo, aumente esses limites. O site envia o IP real de cada pessoa no cabeçalho `Sb-Forwarded-For`.
 
 ### 2.3 Verificação em duas etapas (painel admin)
 
@@ -89,7 +91,9 @@ O link do e-mail de confirmação leva para `/home`; sem essas URLs, o Supabase 
 Em **Emails → Templates**, traduza para português pelo menos **Confirm signup**, **Invite user** (convite do painel admin) e **Reset password**. Exemplo para a confirmação:
 
 > **Assunto:** Confirme seu cadastro no LavaPro
-> **Corpo:** Olá! Clique no link para ativar sua conta no LavaPro: `{{ .ConfirmationURL }}`
+> **Corpo:** Olá! Clique no link para ativar sua conta no LavaPro: `{{ .SiteURL }}/confirmar-email?token_hash={{ .TokenHash }}&type=email`
+
+No **Confirm signup**, use esse link com `token_hash` em vez de `{{ .ConfirmationURL }}`: assim a confirmação é feita pelo servidor e nenhum token aparece no endereço. O link padrão também funciona, mas é menos limpo.
 
 ---
 
@@ -157,8 +161,6 @@ O site fica na pasta **`lava-jato-clean/`** e é publicado na **Vercel** (hoje e
 
 | Variável | Valor |
 |----------|-------|
-| `VITE_SUPABASE_URL` | Project URL |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | Publishable key |
 | `SUPABASE_URL` | Project URL |
 | `SUPABASE_PUBLISHABLE_KEY` | Publishable key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Secret / service_role key |
@@ -275,8 +277,8 @@ O **Dono** é o único que vê a aba **Equipe** e convida ou remove administrado
 
 | Variável | Site | Painel | Pública? |
 |----------|:----:|:------:|:--------:|
-| `VITE_SUPABASE_URL` | ✔ | ✔ | sim |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | ✔ | ✔ | sim |
+| `VITE_SUPABASE_URL` | | ✔ | sim |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | | ✔ | sim |
 | `SUPABASE_URL` | ✔ | ✔ | — |
 | `SUPABASE_PUBLISHABLE_KEY` | ✔ | ✔ | — |
 | `SUPABASE_SERVICE_ROLE_KEY` | ✔ | ✔ | **secreta** |

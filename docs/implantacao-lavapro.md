@@ -65,8 +65,8 @@ Cadastro com confirmação de e-mail, links de convite do painel e o Google Auth
 - [ ] **Providers → Email:** ligar **Confirm email**.
 - [ ] **Password:** tamanho mínimo **8**.
 - [ ] **Multi-Factor:** deixar **TOTP (App Authenticator)** ligado.
-- [ ] **Emails → Templates:** traduzir para português **Confirm signup**, **Invite user** e **Reset password**.
-- [ ] **Rate Limits:** conferir os limites de cadastro e login (os padrões servem para começar).
+- [ ] **Emails → Templates:** traduzir para português **Confirm signup**, **Invite user** e **Reset password**. No **Confirm signup**, usar o link `{{ .SiteURL }}/confirmar-email?token_hash={{ .TokenHash }}&type=email` (a confirmação fica pelo servidor; o modelo está em `docs/configuracao.md`, passo 2.4).
+- [ ] **Rate Limits:** conferir os limites de cadastro, login e renovação de sessão. O login passa pelo servidor do site, então muitos acessos chegam dos mesmos endereços da Vercel: se aparecer "Muitas tentativas" para pessoas diferentes, aumente os limites.
 
 ## 3. Provedor de e-mail (SMTP)
 
@@ -177,8 +177,8 @@ O Dono é o único que vê a aba **Equipe** e convida ou remove administradores.
 
 | Variável | Site | Painel | Tipo | De onde vem |
 |---|:---:|:---:|---|---|
-| `VITE_SUPABASE_URL` | ✓ | ✓ | pública | Passo 1 |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | ✓ | ✓ | pública | Passo 1 |
+| `VITE_SUPABASE_URL` | | ✓ | pública | Passo 1 |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | | ✓ | pública | Passo 1 |
 | `SUPABASE_URL` | ✓ | ✓ | pública | Passo 1 |
 | `SUPABASE_PUBLISHABLE_KEY` | ✓ | ✓ | pública | Passo 1 |
 | `SUPABASE_SERVICE_ROLE_KEY` | ✓ | ✓ | **secreta** | Passo 1 |
@@ -189,6 +189,8 @@ O Dono é o único que vê a aba **Equipe** e convida ou remove administradores.
 | `VAPID_SUBJECT` | ✓ | | pública | Endereço do site |
 | `OPENAI_API_KEY` | opcional | | **secreta** | Passo 5 |
 | `OPENAI_VISION_MODEL` | opcional | | pública | Ex.: `gpt-4.1-mini` |
+
+O site **não** usa `VITE_SUPABASE_URL` nem `VITE_SUPABASE_PUBLISHABLE_KEY`: o login passa pelo servidor e o navegador não fala com o Supabase. Se essas variáveis já existirem no projeto do site, podem ser apagadas.
 
 Ficam fora da Vercel: a **Secret Key do Turnstile** (no Supabase, passo 7) e a **senha do SMTP** (no Supabase, passo 3).
 

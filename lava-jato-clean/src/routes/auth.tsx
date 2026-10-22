@@ -3,7 +3,6 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, MailCheck } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +17,8 @@ import {
   startDemoSession,
 } from "@/lib/demo-auth";
 import { getDemoOwnerLoginHint, verifyOwnerBusiness } from "@/lib/lavajato.functions";
+import { resendConfirmation, signInOwner, signOutOwner, signUpOwner } from "@/lib/auth.functions";
+import { clearLegacySupabaseTokens, forgetOwner, getOwner } from "@/lib/auth-client";
 import { WashBrand, WashMark } from "@/components/app/wash-brand";
 import { WashHoseBackdrop } from "@/components/app/wash-hose-backdrop";
 import { TRIAL_DAYS } from "@/lib/plans";
@@ -44,6 +45,10 @@ function AuthPage() {
   const navigate = useNavigate();
   const getDemoLoginHint = useServerFn(getDemoOwnerLoginHint);
   const verifyBusiness = useServerFn(verifyOwnerBusiness);
+  const signIn = useServerFn(signInOwner);
+  const signUp = useServerFn(signUpOwner);
+  const signOut = useServerFn(signOutOwner);
+  const resend = useServerFn(resendConfirmation);
   const search = Route.useSearch();
   const [mode, setMode] = useState<"login" | "signup">(
     search.modo === "cadastro" ? "signup" : "login",
@@ -67,19 +72,15 @@ function AuthPage() {
     return () => window.clearTimeout(timer);
   }, [resendWait]);
 
-  const captchaOption = captchaToken ? { captchaToken } : {};
-
-  async function resendConfirmation(target: string) {
+  async function resendLink(target: string) {
     if (resendWait > 0) return;
-    const { error } = await supabase.auth.resend({
-      type: "signup",
-      email: target,
-      options: { emailRedirectTo: `${window.location.origin}/home`, ...captchaOption },
-    });
-    setCaptchaReset((value) => value + 1);
-    if (error) {
-      toast.error(authErrorMessage(error.message));
+    try {
+      await resend({ data: { email: target, captchaToken } });
+    } catch (err) {
+      toast.error(authErrorMessage(err instanceof Error ? err.message : String(err)));
       return;
+    } finally {
+      setCaptchaReset((value) => value + 1);
     }
     setResendWait(60);
     toast.success("Enviamos o link de novo. Veja também a caixa de spam.");
@@ -92,9 +93,12 @@ function AuthPage() {
     }
     // No modo demonstração o Supabase não é configurado.
     if (isDemoEnabled()) return;
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/home", replace: true });
-    });
+    clearLegacySupabaseTokens();
+    getOwner()
+      .then((owner) => {
+        if (owner) navigate({ to: "/home", replace: true });
+      })
+      .catch(() => undefined);
   }, [navigate]);
 
   async function submit(e: React.FormEvent) {
@@ -125,32 +129,24 @@ function AuthPage() {
         if (password.length < MIN_PASSWORD_LENGTH) {
           throw new Error(`Use uma senha com pelo menos ${MIN_PASSWORD_LENGTH} caracteres.`);
         }
-        const { data: created, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/home`,
-            data: { nome },
-            ...captchaOption,
-          },
-        });
-        if (error) throw error;
+        const created = await signUp({ data: { email, password, nome, captchaToken } });
+        forgetOwner();
         // Com a confirmação de e-mail ligada, a conta só entra depois do link.
-        if (!created.session) {
+        if (created.pendingConfirmation) {
           setPendingEmail(email);
           setResendWait(60);
           return;
         }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-          options: captchaOption,
-        });
-        if (error) {
-          if (/email not confirmed/i.test(error.message)) setPendingEmail(email);
+        try {
+          await signIn({ data: { email, password, captchaToken } });
+        } catch (error) {
+          if (error instanceof Error && /email not confirmed/i.test(error.message)) {
+            setPendingEmail(email);
+          }
           throw error;
         }
+        forgetOwner();
         try {
           const verification = await verifyBusiness({ data: { businessName } });
           if (verification.needsOnboarding) {
@@ -158,7 +154,8 @@ function AuthPage() {
             return;
           }
         } catch {
-          await supabase.auth.signOut();
+          await signOut().catch(() => undefined);
+          forgetOwner();
           throw new Error("Nome do lava-jato, e-mail ou senha incorretos.");
         }
       }
@@ -221,7 +218,7 @@ function AuthPage() {
                 variant="outline"
                 className="h-11 w-full rounded-2xl"
                 disabled={resendWait > 0 || (captchaRequired && !captchaToken)}
-                onClick={() => void resendConfirmation(pendingEmail)}
+                onClick={() => void resendLink(pendingEmail)}
               >
                 {resendWait > 0 ? `Reenviar em ${resendWait}s` : "Reenviar o link"}
               </Button>

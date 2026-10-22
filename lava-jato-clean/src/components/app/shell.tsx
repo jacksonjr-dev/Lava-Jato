@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { m } from "motion/react";
-import { supabase } from "@/integrations/supabase/client";
+import { signOutOwner } from "@/lib/auth.functions";
+import { forgetOwner } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -78,7 +79,8 @@ export function AppShell({
     await queryClient.cancelQueries();
     queryClient.clear();
     if (hasDemoSession()) endDemoSession();
-    else await supabase.auth.signOut();
+    else await signOutOwner().catch(() => undefined);
+    forgetOwner();
     navigate({ to: "/auth", replace: true });
   }
 
