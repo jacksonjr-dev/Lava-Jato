@@ -6,27 +6,13 @@ import { Button } from "@/components/ui/button";
 import { WashMark } from "@/components/app/wash-brand";
 import { confirmEmail } from "@/lib/auth.functions";
 import { forgetOwner } from "@/lib/auth-client";
+import { readEmailLinkTokens } from "@/lib/email-link";
 
 export const Route = createFileRoute("/confirmar-email")({
   ssr: false,
   head: () => ({ meta: [{ title: "Confirmando e-mail — LavaPro" }] }),
   component: ConfirmEmailPage,
 });
-
-/** Lê o link do e-mail: ?token_hash=… (modelo recomendado) ou #refresh_token=… (padrão). */
-function linkTokens(): { tokenHash?: string; refreshToken?: string; error?: string } {
-  const search = new URLSearchParams(window.location.search);
-  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-  // Tira os tokens da barra de endereço e do histórico antes de qualquer coisa.
-  window.history.replaceState(null, "", window.location.pathname);
-  const error = hash.get("error_description") ?? search.get("error_description");
-  if (error) return { error };
-  const tokenHash = search.get("token_hash");
-  if (tokenHash) return { tokenHash };
-  const refreshToken = hash.get("refresh_token");
-  if (refreshToken) return { refreshToken };
-  return { error: "Link incompleto." };
-}
 
 function ConfirmEmailPage() {
   const navigate = useNavigate();
@@ -37,8 +23,8 @@ function ConfirmEmailPage() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    const tokens = linkTokens();
-    if (tokens.error) {
+    const tokens = readEmailLinkTokens();
+    if ("error" in tokens) {
       setFailed(true);
       return;
     }

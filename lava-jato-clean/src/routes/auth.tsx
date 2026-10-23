@@ -24,6 +24,7 @@ import { WashHoseBackdrop } from "@/components/app/wash-hose-backdrop";
 import { TRIAL_DAYS } from "@/lib/plans";
 import { authErrorMessage, MIN_PASSWORD_LENGTH, turnstileSiteKey } from "@/lib/captcha";
 import { Turnstile } from "@/components/app/turnstile";
+import { ForgotPassword } from "@/components/app/forgot-password";
 import { AnimatePresence, m } from "motion/react";
 
 export const Route = createFileRoute("/auth")({
@@ -65,6 +66,7 @@ function AuthPage() {
   // Conta criada aguardando a confirmação do e-mail.
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [resendWait, setResendWait] = useState(0);
+  const [forgot, setForgot] = useState(false);
 
   useEffect(() => {
     if (resendWait <= 0) return;
@@ -233,6 +235,8 @@ function AuthPage() {
                 Já confirmei — entrar
               </Button>
             </div>
+          ) : forgot ? (
+            <ForgotPassword initialEmail={email} onBack={() => setForgot(false)} />
           ) : (
             <AnimatePresence mode="wait" initial={false}>
               <m.div
@@ -313,7 +317,18 @@ function AuthPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="password">Senha</Label>
+                    <div className="flex items-center justify-between gap-3">
+                      <Label htmlFor="password">Senha</Label>
+                      {mode === "login" ? (
+                        <button
+                          type="button"
+                          className="text-xs font-semibold text-primary underline-offset-4 hover:underline"
+                          onClick={() => setForgot(true)}
+                        >
+                          Esqueci minha senha
+                        </button>
+                      ) : null}
+                    </div>
                     <Input
                       id="password"
                       type="password"
@@ -349,7 +364,7 @@ function AuthPage() {
             </AnimatePresence>
           )}
 
-          {pendingEmail ? null : (
+          {pendingEmail || forgot ? null : (
             <button
               type="button"
               className="mt-6 w-full text-sm text-muted-foreground underline-offset-4 hover:underline"

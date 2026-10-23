@@ -157,6 +157,12 @@ Recomendado também: em **Authentication → Emails → Templates → Confirm si
 {{ .SiteURL }}/confirmar-email?token_hash={{ .TokenHash }}&type=email
 ```
 
+E em **Reset password** ("Esqueci minha senha"):
+
+```
+{{ .SiteURL }}/redefinir-senha?token_hash={{ .TokenHash }}&type=recovery
+```
+
 Assim a confirmação é feita pelo servidor e nenhum token aparece no endereço. O link padrão também funciona.
 
 ## 7. Criar o Dono do painel admin (se ainda não existir)

@@ -49,6 +49,22 @@ export function parseResend(input: unknown): { email: string; captchaToken?: str
   return { email: parseEmail(data["email"]), ...(captchaToken ? { captchaToken } : {}) };
 }
 
+export function parseNewPassword(value: unknown): string {
+  const password = typeof value === "string" ? value : "";
+  if (password.length < MIN_PASSWORD_LENGTH || password.length > 128) {
+    throw new Error(`Use uma senha com pelo menos ${MIN_PASSWORD_LENGTH} caracteres.`);
+  }
+  return password;
+}
+
+/** Nova senha + o token do link de recuperação (mesmos formatos do link de confirmação). */
+export function parsePasswordReset(
+  input: unknown,
+): ({ tokenHash: string } | { refreshToken: string }) & { password: string } {
+  const data = record(input);
+  return { ...parseConfirmation(data), password: parseNewPassword(data["password"]) };
+}
+
 /** Link do e-mail de confirmação: ?token_hash=… (modelo novo) ou #refresh_token=… (padrão). */
 export function parseConfirmation(
   input: unknown,

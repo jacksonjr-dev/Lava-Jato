@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { parseConfirmation, parseCredentials, parseResend, parseSignUp } from "./auth-input";
+import {
+  parseConfirmation,
+  parseCredentials,
+  parsePasswordReset,
+  parseResend,
+  parseSignUp,
+} from "./auth-input";
 
 describe("entrar", () => {
   it("normaliza o e-mail e descarta captcha vazio", () => {
@@ -53,5 +59,22 @@ describe("link de confirmação", () => {
     });
     expect(() => parseConfirmation({ tokenHash: "a b<script>" })).toThrow("inválido");
     expect(() => parseConfirmation({})).toThrow("inválido");
+  });
+});
+
+describe("esqueci minha senha", () => {
+  it("exige o token do link e uma senha nova válida", () => {
+    expect(parsePasswordReset({ tokenHash: "pkce_abc12345", password: "novasenha1" })).toEqual({
+      tokenHash: "pkce_abc12345",
+      password: "novasenha1",
+    });
+    expect(parsePasswordReset({ refreshToken: "abcdefgh123", password: "novasenha1" })).toEqual({
+      refreshToken: "abcdefgh123",
+      password: "novasenha1",
+    });
+    expect(() => parsePasswordReset({ tokenHash: "pkce_abc12345", password: "curta" })).toThrow(
+      "8",
+    );
+    expect(() => parsePasswordReset({ password: "novasenha1" })).toThrow("inválido");
   });
 });

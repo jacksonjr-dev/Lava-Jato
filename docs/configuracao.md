@@ -95,6 +95,15 @@ Em **Emails → Templates**, traduza para português pelo menos **Confirm signup
 
 No **Confirm signup**, use esse link com `token_hash` em vez de `{{ .ConfirmationURL }}`: assim a confirmação é feita pelo servidor e nenhum token aparece no endereço. O link padrão também funciona, mas é menos limpo.
 
+No **Reset password** ("Esqueci minha senha"), o mesmo princípio:
+
+> **Assunto:** Crie uma senha nova no LavaPro
+> **Corpo:** Recebemos um pedido para trocar a senha da sua conta. Clique no link para criar uma senha nova: `{{ .SiteURL }}/redefinir-senha?token_hash={{ .TokenHash }}&type=recovery`. Se não foi você, ignore este e-mail: sua senha continua a mesma.
+
+O link vale por 1 hora e só pode ser usado uma vez. Depois da troca, o sistema encerra a sessão em todos os aparelhos.
+
+> Personalizar os modelos exige o **SMTP próprio** (passo 3); no plano gratuito, o Supabase recusa a alteração enquanto o e-mail padrão estiver em uso.
+
 ---
 
 ## 3. Provedor de e-mail (SMTP próprio)

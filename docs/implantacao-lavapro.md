@@ -65,7 +65,7 @@ Cadastro com confirmação de e-mail, links de convite do painel e o Google Auth
 - [ ] **Providers → Email:** ligar **Confirm email**.
 - [ ] **Password:** tamanho mínimo **8**.
 - [ ] **Multi-Factor:** deixar **TOTP (App Authenticator)** ligado.
-- [ ] **Emails → Templates:** traduzir para português **Confirm signup**, **Invite user** e **Reset password**. No **Confirm signup**, usar o link `{{ .SiteURL }}/confirmar-email?token_hash={{ .TokenHash }}&type=email` (a confirmação fica pelo servidor; o modelo está em `docs/configuracao.md`, passo 2.4).
+- [ ] **Emails → Templates:** traduzir para português **Confirm signup**, **Invite user** e **Reset password**. No **Confirm signup**, usar o link `{{ .SiteURL }}/confirmar-email?token_hash={{ .TokenHash }}&type=email` (a confirmação fica pelo servidor; o modelo está em `docs/configuracao.md`, passo 2.4). No **Reset password**, usar `{{ .SiteURL }}/redefinir-senha?token_hash={{ .TokenHash }}&type=recovery`.
 - [ ] **Rate Limits:** conferir os limites de cadastro, login e renovação de sessão. O login passa pelo servidor do site, então muitos acessos chegam dos mesmos endereços da Vercel: se aparecer "Muitas tentativas" para pessoas diferentes, aumente os limites.
 
 ## 3. Provedor de e-mail (SMTP)

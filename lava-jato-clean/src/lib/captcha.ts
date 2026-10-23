@@ -20,6 +20,9 @@ export function authErrorMessage(message: string): string {
   if (/already registered|already exists/i.test(message)) {
     return "Este e-mail já tem conta. Entre ou recupere a senha.";
   }
+  if (/different from the old password/i.test(message)) {
+    return "A nova senha precisa ser diferente da anterior.";
+  }
   if (/password should be at least|weak password/i.test(message)) {
     return `Use uma senha com pelo menos ${MIN_PASSWORD_LENGTH} caracteres.`;
   }

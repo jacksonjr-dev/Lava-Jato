@@ -9,6 +9,10 @@ import type { Database } from "./types";
 const ACCESS_COOKIE = "lp_at";
 const REFRESH_COOKIE = "lp_rt";
 const REFRESH_MAX_AGE = 60 * 60 * 24 * 30;
+// Recuperação de senha: se a senha nova for recusada, a pessoa tenta de novo sem
+// precisar de outro link (o do e-mail só vale uma vez).
+const RECOVERY_COOKIE = "lp_rec";
+const RECOVERY_MAX_AGE = 60 * 10;
 
 export type ActiveSession = {
   accessToken: string;
@@ -108,9 +112,31 @@ export function saveSession(session: SessionTokens): void {
   setCookie(REFRESH_COOKIE, session.refresh_token, sessionCookieOptions(REFRESH_MAX_AGE));
 }
 
+export function saveRecovery(refreshToken: string): void {
+  setCookie(RECOVERY_COOKIE, refreshToken, sessionCookieOptions(RECOVERY_MAX_AGE));
+}
+
+export function takeRecovery(): string | undefined {
+  const value = getCookie(RECOVERY_COOKIE);
+  if (value) deleteCookie(RECOVERY_COOKIE, sessionCookieOptions(0));
+  return value;
+}
+
 export function clearSession(): void {
   deleteCookie(ACCESS_COOKIE, sessionCookieOptions(0));
   deleteCookie(REFRESH_COOKIE, sessionCookieOptions(0));
+}
+
+/** A sessão nasceu do link "Esqueci minha senha"? (o Supabase marca em `amr`). */
+export function isRecoverySession(accessToken: string): boolean {
+  try {
+    const payload = JSON.parse(
+      Buffer.from(accessToken.split(".")[1] ?? "", "base64url").toString("utf8"),
+    ) as { amr?: Array<{ method?: string }> };
+    return Array.isArray(payload.amr) && payload.amr.some((item) => item.method === "recovery");
+  } catch {
+    return false;
+  }
 }
 
 async function verifyAccessToken(token: string): Promise<ActiveSession | null> {
